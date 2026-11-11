@@ -31,7 +31,28 @@ def is_restart(ev):
                                              & ev["subtype"].str.contains("GOAL KICK"))
 
 
-def ground_truth(events, n_frames):
+def absorb_short_spells(labels, blocks, min_s, fps=25):
+    """Stress-test variant of the ground truth: a possession shorter than min_s between two
+    possessions of the other team (A-H-A) is taken as a touch without control and given to them.
+
+    The challenge's own ground truth does have very short possessions, so this is not the
+    definition; it checks that a decision does not hinge on how short possessions are counted.
+    """
+    labels = labels.copy()
+    for _, a, b in blocks:
+        lab = labels[a:b + 1]
+        change = np.flatnonzero(lab[1:] != lab[:-1]) + 1
+        starts, ends = np.r_[0, change], np.r_[change, len(lab)]
+        for i in range(1, len(starts) - 1):
+            mid, prev, nxt = lab[starts[i]], lab[starts[i - 1]], lab[starts[i + 1]]
+            if (mid in ("H", "A") and prev == nxt and prev in ("H", "A") and prev != mid
+                    and ends[i] - starts[i] < min_s * fps):
+                lab[starts[i]:ends[i]] = prev
+        labels[a:b + 1] = lab
+    return labels
+
+
+def ground_truth(events, n_frames, min_spell_s=0.0):
     """(labels (N,) of 'H'/'A'/'D'/'X', blocks [(period, first, last)] graded, inclusive)."""
     labels = np.full(n_frames, "X", dtype="<U1")
     restart = is_restart(events)
@@ -67,6 +88,8 @@ def ground_truth(events, n_frames):
             if stop + 1 < s:
                 lab[stop + 1 - first:s - first] = "D"
         labels[first:last + 1] = lab
+    if min_spell_s > 0:
+        labels = absorb_short_spells(labels, blocks, min_spell_s)
     return labels, blocks
 
 

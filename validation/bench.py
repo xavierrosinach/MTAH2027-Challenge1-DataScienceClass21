@@ -130,7 +130,8 @@ def run_job(job):
 
     tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=base_cfg["paths"]["cache_dir"])
     events = metrica.load_events(bench["metrica_dir"], game)
-    gt, blocks = gt_events.ground_truth(events, tr["n_frames"])
+    gt, blocks = gt_events.ground_truth(events, tr["n_frames"],
+                                        (bench.get("gt") or {}).get("min_spell_s", 0.0))
     if seed is not None:
         tr = deg.degrade(tr, gt, bench["degrade"], seed)
     tags = (synthetic_tags(events, blocks, bench["synthetic_tags"], 0 if seed is None else seed)

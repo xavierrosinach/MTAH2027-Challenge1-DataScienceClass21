@@ -10,6 +10,9 @@ the ball missing on ~41 % of graded frames in long gaps.
 - ball_live_gaps: extra ball gaps while the ball is alive (the Metrica ball is already missing
   during most stoppages, like ours); placed at random, at a rate per minute of live play.
 - noise_m: Gaussian noise (m) on every position.
+- ball_noise: smooth (time-correlated) noise on the ball. The Metrica ball sits on the feet of the
+  player who has it (median distance to the nearest player 0.3 m); the BAR-ATH ball does not
+  (1.9 m), so without this the bench rewards trusting tiny distances.
 
 Every option is seeded; the same seed gives the same degraded game.
 """
@@ -46,6 +49,18 @@ def add_ball_gaps(ball, live, rng, per_min, median_s, sigma=0.8, fps=25):
     return ball
 
 
+def smooth_noise(rng, n, sigma_m, corr_s, fps=25):
+    """(n, 2) Gaussian noise in metres with standard deviation sigma_m per axis, correlated over
+    ~corr_s (a detection/projection error drifts, it does not jump every frame)."""
+    width = max(1.0, corr_s * fps)
+    half = int(4 * width)
+    t = np.arange(-half, half + 1)
+    kernel = np.exp(-0.5 * (t / width) ** 2)
+    kernel /= np.sqrt((kernel ** 2).sum())
+    white = rng.normal(0.0, sigma_m, (n + 2 * half, 2))
+    return np.column_stack([np.convolve(white[:, k], kernel, mode="valid") for k in (0, 1)])
+
+
 def lose_ball_early(ball, rng, median_s, min_gap_s=5.0, sigma=0.8, fps=25):
     """Start every long ball gap earlier: an automatic tracker loses the ball in the air or among
     players before it goes out, not exactly when play stops."""
@@ -70,6 +85,9 @@ def degrade(tracking, gt_labels, cfg, seed):
     if cfg.get("noise_m", 0) > 0:
         players = players + rng.normal(0, cfg["noise_m"], players.shape) / scale
         ball = ball + rng.normal(0, cfg["noise_m"], ball.shape) / scale
+    bn = cfg.get("ball_noise") or {}
+    if bn.get("sigma_m", 0) > 0:
+        ball = ball + smooth_noise(rng, len(ball), bn["sigma_m"], bn["corr_s"]) / scale
     p = cfg.get("players") or {}
     if p.get("enabled", False):
         players, team = fragment_players(players, team, rng, p["fragment_median_s"],

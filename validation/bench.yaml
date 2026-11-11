@@ -14,27 +14,38 @@ synthetic_tags:
   recall: 0.8               # share of restarts that get a tag
 
 # Make the tracking look like the BAR-ATH ATD (validation/degrade.py). Calibrated on aggregate
-# statistics of our tracking only (no labels).
-# Label-free targets (python validation/calibrate.py): BAR-ATH misses the ball on 40.7 % of graded
-# frames, has ~112 gaps >= 5 s per 90 min, only 32 % of them start within 2 m of a line (Metrica:
-# ~68 %, it loses the ball exactly when play stops). No setting reproduces the published BAR-ATH
-# baseline scores (BAR-ATH is harder in absolute terms), so versions are compared on a suite of
-# conditions (--suite) and a change must win on all of them.
+# statistics of our tracking only, no labels (python validation/calibrate.py): BAR-ATH misses the
+# ball on 40.7 % of graded frames, has ~112 gaps >= 5 s per 90 min, only 32 % of them start within
+# 2 m of a line (Metrica: ~68 %, it loses the ball exactly when play stops), and its ball is a median
+# 1.9 m from the nearest player (Metrica: 0.3 m). Check: the official baselines come out in the same
+# order as their published BAR-ATH scores, a bit higher (smooth50 0.30 vs 0.24).
+# Versions are compared on a suite of conditions (--suite); a change must win on all of them.
 degrade:
   enabled: true
-  seeds: [0, 1]
+  seeds: [0, 1, 2, 3]
   noise_m: 0.0              # iid noise only adds flicker: BAR-ATH flickers less than clean Metrica
   players:
     enabled: true
     fragment_median_s: 35   # BAR-ATH: median slot run ~886 frames
     gap_median_s: 1.0       #   unseen between fragments -> ~10-11 visible per team
+  ball_noise:               # smooth error on the ball position. Metrica's ball sits on the possessor's
+    sigma_m: 1.2            #   feet (median distance to the nearest player 0.3 m), BAR-ATH's does not
+    corr_s: 1.0             #   (1.9 m). With it the bench ranks the 4 official baselines in the same
+                            #   order as their published BAR-ATH scores (50 > 125 > 25 > raw)
   ball_lost_early_s: 0.6    # long gaps start this much earlier (median): gap start at a line ~32 %
   ball_live_gaps:
     per_min: 0.5            # extra ball gaps in live play per live minute
     median_s: 8.0           #   -> ~42 % missing, ~90 long gaps per 90 min
 
+# Ground truth variant (validation/gt_events.py). 0 = as derived from the events.
+gt:
+  min_spell_s: 0.0          # > 0: possessions shorter than this between two of the rival are absorbed
+
 # --suite: the conditions every change is judged on (name: overrides of the settings above)
+# (Undegraded Metrica is not a condition: its ball glued to the feet rewards trusting tiny distances.)
 suite:
-  clean: {degrade: {enabled: false}, tags: none}
+  light: {tags: none, degrade: {ball_noise: {sigma_m: 0.6}, ball_lost_early_s: 0.0,
+                                ball_live_gaps: {per_min: 0.0}}}
   degraded: {tags: none}
   degraded+tags: {tags: events}
+  degraded+coarseGT: {tags: none, gt: {min_spell_s: 2.0}}
