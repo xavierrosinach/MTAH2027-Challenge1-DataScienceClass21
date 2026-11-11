@@ -1,0 +1,40 @@
+# Validation bench on other games (python validation/bench.py). Not used to build the submission.
+# Data: public Metrica Sports sample games, cloned beside this repo:
+#   git clone https://github.com/metrica-sports/sample-data ../external/metrica-sample-data
+
+metrica_dir: ../external/metrica-sample-data
+games: [Sample_Game_1, Sample_Game_2, Sample_Game_3]
+
+# Smart Tagging stand-in. The Metrica games have no Smart Tagging.
+#   none   : no tags at all (only the tracking speaks)
+#   events : SET PIECES tags built from the restarts of the event data (optimistic stand-in)
+tags: none
+synthetic_tags:
+  lead_s: 4                 # the tag starts 4 s before the restart
+  recall: 0.8               # share of restarts that get a tag
+
+# Make the tracking look like the BAR-ATH ATD (validation/degrade.py). Calibrated on aggregate
+# statistics of our tracking only (no labels).
+# Label-free targets (python validation/calibrate.py): BAR-ATH misses the ball on 40.7 % of graded
+# frames, has ~112 gaps >= 5 s per 90 min, only 32 % of them start within 2 m of a line (Metrica:
+# ~68 %, it loses the ball exactly when play stops). No setting reproduces the published BAR-ATH
+# baseline scores (BAR-ATH is harder in absolute terms), so versions are compared on a suite of
+# conditions (--suite) and a change must win on all of them.
+degrade:
+  enabled: true
+  seeds: [0, 1]
+  noise_m: 0.0              # iid noise only adds flicker: BAR-ATH flickers less than clean Metrica
+  players:
+    enabled: true
+    fragment_median_s: 35   # BAR-ATH: median slot run ~886 frames
+    gap_median_s: 1.0       #   unseen between fragments -> ~10-11 visible per team
+  ball_lost_early_s: 0.6    # long gaps start this much earlier (median): gap start at a line ~32 %
+  ball_live_gaps:
+    per_min: 0.5            # extra ball gaps in live play per live minute
+    median_s: 8.0           #   -> ~42 % missing, ~90 long gaps per 90 min
+
+# --suite: the conditions every change is judged on (name: overrides of the settings above)
+suite:
+  clean: {degrade: {enabled: false}, tags: none}
+  degraded: {tags: none}
+  degraded+tags: {tags: events}
