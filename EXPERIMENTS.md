@@ -12,6 +12,8 @@ python validation/bench.py --suite                                   # config.ya
 python validation/bench.py --suite --configs ref=a.yaml new=b.yaml   # two versions side by side
 python validation/sweep.py context.transition_cost.team_switch 12 16 # one parameter vs the config
 python validation/calibrate.py [--grid]                              # how the degradation was chosen
+python validation/train_control.py                                   # learnt control model (models/control.json)
+python validation/check_control.py                                   # its features on BAR-ATH vs the bench (aggregates)
 ```
 
 - **Games**: the three public Metrica Sports sample matches (anonymised, 25 fps, 105 x 68 m,
@@ -49,12 +51,49 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 |---|---------|------:|---------:|------:|----------:|-----------:|-----------:|-----:|----------|
 | 0 | official baseline_smooth50 | 0.360 | 0.303 | 0.303 | 0.310 | 0.319 | 0.769 | ~590 | floor |
 | 1 | main 6791db5 (Xavier, Viterbi) | 0.507 | 0.404 | 0.435 | 0.473 | 0.455 | 0.812 | ~215 | reference |
-| 2 | #1 + `team_switch` 20 -> 16 | 0.520 | 0.415 | 0.443 | 0.476 | 0.463 | 0.812 | ~237 | **kept** |
+| 2 | #1 + `team_switch` 20 -> 16 | 0.520 | 0.415 | 0.443 | 0.476 | 0.463 | 0.812 | ~237 | kept |
+| 3 | #2 + learnt control model (`context.control`, weight 1) | 0.609 | 0.540 | 0.565 | 0.617 | **0.583** | **0.847** | ~244 | **kept** |
 
 Entry 2: +0.009 spellF1, better under all 4 conditions (worst +0.003), 10/12 cells, games 1 and 3 up,
 game 2 flat (-0.003). The reference under-segments (215 predicted vs 384 true possessions); a
 cheaper hand-over lets it keep more of the short ones. 12 scores a little more on average but
 loses under coarseGT, so 16.
+
+Entry 3: **+0.119 spellF1, +0.035 macroF1, better under all 4 conditions (worst +0.089), 12/12
+cells.** `src/possession/control.py` replaces the nearest-player evidence with a model of who
+controls the ball, learnt on the other games:
+
+- *Model*: conditional logit, P(H) = sigmoid(w . (g(H) - g(A))), one model for frames with the
+  ball, one for gaps. 42 features per team, all relative to the ball or to the team itself, on the
+  frame, the second before, the second after and +/- 2 s: nearest and second-nearest player
+  (exp(-d/1, 2.5, 6 m)), players within 5 / 10 m, share of the team goal-side of the ball, ball
+  position and velocity towards the team's attacking goal, team shape (context.team_shape_features).
+  Symmetric by construction: no home bias, nothing specific to a team.
+- *Training* (`python validation/train_control.py`): live frames of the 3 Metrica games, tracking
+  degraded as in `degraded` with seeds 100 and 101 (not the bench's 0-3), event-derived possession.
+  Deterministic (retraining gives a byte-identical `models/control.json`, which `run.py` reads; it
+  needs neither Metrica data nor training).
+- *No leakage into the bench*: the bench labels each game with `logo_<game>.json`, trained on the
+  other two games only.
+- *Held-out per-frame accuracy* (live frames, ball seen): 92.4-92.6 % vs 72.9-74.9 % for "team of
+  the nearest player" (81-83 % on the half of the frames where someone is within 2 m). Stable
+  across training seeds (200/201, a single seed) and L2 (1 vs 100): +-0.2 pt.
+- *Same signal on BAR-ATH* (`python validation/check_control.py`, label-free aggregates): the model
+  is as confident on BAR-ATH as on the degraded games (|llr| > 2 on 79 % vs 79 % of frames with
+  ball, median |llr| 4.26 vs 4.23, sign flips 5.4 vs 6.2 per minute). Every feature has the same
+  scale (median |H - A| within 0.7-1.5x, 90th percentile within 0.97-1.4x) except the deepest
+  player and the length of the team (1.4-1.7x at the 90th percentile: tactics or keepers); speeds
+  are in the same unit.
+- *Harsher tracking than it was trained on* (ball noise 2 m, player fragments 12 s, twice the ball
+  gaps): 0.508 vs 0.361 spellF1 for #2. The gain grows when the tracking gets worse.
+- *Error analysis* (degraded, #2 -> #3): possessions found at IoU 0.5: 2-5 s 18 -> 35 %, 5-10 s
+  44 -> 63 %, 10-20 s 69 -> 75 %, > 20 s 70 -> 77 %; < 2 s still 2 -> 8 %. Hand-overs with a
+  predicted one within 5 s 53 -> 64 %, mean timing error 1.66 -> 1.21 s.
+- *Weight* (per-frame llr, clip 4): 0.05 / 0.1 / 0.2 / 0.4 / 0.7 / 1 / 1.5 / 2.5 -> +0.005 / +0.040
+  / +0.068 / +0.098 / +0.112 / +0.119 / +0.124 / +0.123: flat from 1 to 2.5, so 1.
+- Tried on top and not kept (all within +-0.006, i.e. bench noise): `team_switch` 10 / 13 / 20 / 24
+  (+0.006 but loses coarseGT / +0.004 / -0.006 / -0.010); gap model weight 0.1 / 0.3 / 0.6
+  (+0.001 / +0.003 / +0.003); keeping the nearest-player evidence as well (-0.000, 5/12).
 
 ### Tried and rejected
 
@@ -67,7 +106,7 @@ loses under coarseGT, so 16.
 | `passes.pass_llr` 8, 25 (first bench) | +-0.001 | no effect |
 | `team_switch` 28 | -0.021, 0/12 | |
 
-### Where the labeller still fails (degraded bench, error analysis)
+### Where the labeller still fails (degraded bench, error analysis of #2; see entry 3 for #3)
 
 - Possessions shorter than 5 s are almost never found (2 % of < 2 s, 16 % of 2-5 s matched at
   IoU 0.5), and they are half of all possessions. Missing a short one in A-H-A merges the two A

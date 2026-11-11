@@ -66,6 +66,14 @@ context:
     own_m: 1.0                         # pseudo-etiquetas: el equipo etiquetado a < 1 m del balón visto...
     opp_m: 2.0                         #   ...y el rival a > 2 m
 
+  control:                             # modelo aprendido de quién controla el balón (src/possession/control.py)
+    enabled: true                      # entrenado en OTROS partidos (validation/train_control.py); EXPERIMENTS.md #3
+    model: models/control.json         # pesos (Metrica sample games, tracking degradado; nunca BAR-ATH)
+    replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
+    weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
+    gap_weight: 0.0                    # peso por frame sin balón (solo la forma de los equipos)
+    clip: 4.0                          # límite de su log-odds por frame
+
   passes:                              # toques, golpeos y pases completados
     touch_m: 1.5                       # toque: el jugador más cercano a < 1,5 m del balón visto...
     contest_m: 2.0                     #   ...y ningún rival a < 2 m (si no, el balón está disputado)

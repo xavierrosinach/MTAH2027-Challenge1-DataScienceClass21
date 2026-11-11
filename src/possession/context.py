@@ -9,7 +9,8 @@ frame-by-frame "nearest team" rule has nothing to say there, and a causal hyster
 2. learns P(dead ball) with a logistic regression trained on *algorithmic pseudo-labels*
    (ball clearly out of the pitch, start of a SET PIECES tag, 2nd-half pre-kickoff = dead;
    ball moving at a player's feet in the middle of the pitch = live). No human labels, no GT.
-3. turns the ball-player geometry and the Smart Tagging phases into team log-likelihoods,
+3. turns the ball-player geometry and the Smart Tagging phases into team log-likelihoods (the
+   geometry through a model of who controls the ball learnt on other games: control.py),
 4. decodes the whole match at once with Viterbi, with a cost for every change of state. Being
    non-causal, the change lands where the evidence changes instead of N frames later, and a
    possession survives a ball gap unless something says otherwise ("possession stays with the
@@ -19,6 +20,7 @@ All constants live in config.yaml (section `context`) and are set from physical 
 looking at the data, never from the public ground truth.
 """
 
+import os
 import warnings
 
 import numpy as np
@@ -335,7 +337,7 @@ def add_team_llr(e, llr):
     e[:, A] -= np.maximum(0.0, llr)
 
 
-def emissions(f, p_dead, cfg):
+def emissions(f, p_dead, cfg, proximity=True):
     """(N, 3) log-likelihood scores for H, A, D (up to a per-frame constant)."""
     c = cfg["context"]
     n = len(p_dead)
@@ -347,12 +349,13 @@ def emissions(f, p_dead, cfg):
     e[:, D] += c["dead_weight"] * llr_dead + ball_dead_llr(f, cfg)
 
     # ball at a player's feet: exp(-d/scale) per team, team share weighted by how close anyone is
+    # (off when the learnt control model replaces it)
     s = c["ball"]["scale_m"]
     w_h, w_a = np.exp(-f["d_h"] / s), np.exp(-f["d_a"] / s)    # 0 when inf (no ball / no players)
     tot = w_h + w_a
     with np.errstate(invalid="ignore", divide="ignore"):
         share_h = np.where(tot > 0, w_h / tot, 0.5)
-    strength = c["ball"]["weight"] * np.maximum(w_h, w_a)
+    strength = c["ball"]["weight"] * np.maximum(w_h, w_a) * proximity
     # loose ball (nobody in contact): exactly no evidence, possession stays with the last team
     strength[np.minimum(f["d_h"], f["d_a"]) > c["ball"]["contact_m"]] = 0.0
     team_llr = strength * np.log(np.clip(share_h, 0.02, 0.98) / np.clip(1 - share_h, 0.02, 0.98))
@@ -725,7 +728,20 @@ def label(tracking, ball, tags, cfg, blocks, frame_period=None, verbose=True):
     model = fit_logistic(X[train], y[train].astype(float))
     p_dead = predict_logistic(model, X)
 
-    e = emissions(f, p_dead, cfg)
+    ctl = c.get("control") or {"enabled": False}
+    e = emissions(f, p_dead, cfg, proximity=not (ctl["enabled"] and ctl["replace_proximity"]))
+    if ctl["enabled"]:
+        # learnt "who controls the ball" (src/possession/control.py), trained on other games
+        from . import control
+        from .config import REPO_ROOT
+        path = ctl["model"] if os.path.isabs(ctl["model"]) else os.path.join(REPO_ROOT,
+                                                                              ctl["model"])
+        llr, seen = control.control_llr(tracking, ball, blocks, path)
+        llr = np.clip(llr, -ctl["clip"], ctl["clip"])
+        add_team_llr(e, np.where(seen, ctl["weight"], ctl["gap_weight"]) * llr)
+        if verbose:
+            print("control model {}: |llr| > 2 on {:.0%} of frames with ball".format(
+                os.path.basename(path), np.mean(np.abs(llr[seen]) > 2)))
     if frame_period is not None:                       # FAQ: always D before the 2nd kickoff
         e[frame_period == "2nd_half_pre_kickoff", D] += 1e6
     goal = goal_dead_mask(f, ball, tags, tracking["pitch"], cfg)

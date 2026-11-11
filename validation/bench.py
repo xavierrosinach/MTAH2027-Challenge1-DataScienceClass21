@@ -124,6 +124,14 @@ def run_job(job):
     """One game x one degradation seed: every model on it. Runs in a worker process."""
     game, seed, bench, configs, baselines = job
     cfgs = [(name, load_config(path)) for name, path in configs]
+    for _, cfg in cfgs:
+        ctl = cfg["context"].get("control") or {}
+        if ctl.get("enabled"):
+            # the learnt control model, trained WITHOUT this game (validation/train_control.py)
+            ctl["model"] = os.path.join(cfg["paths"]["output_dir"], "validation", "control",
+                                        "logo_{}.json".format(game))
+            if not os.path.isfile(ctl["model"]):
+                raise FileNotFoundError("run validation/train_control.py first: " + ctl["model"])
     base_cfg = cfgs[0][1]
     sys.path.insert(0, os.path.join(base_cfg["paths"]["official_repo"], "evaluation"))
     import possession_metrics as pm
