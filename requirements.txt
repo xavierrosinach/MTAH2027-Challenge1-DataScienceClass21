@@ -1,0 +1,6 @@
+# Lo necesario para regenerar la entrega y los vídeos (python run.py). Versiones fijadas para que el CSV sea idéntico.
+# Probado con Python 3.12.4.
+numpy==2.5.4
+pandas==3.1.1
+PyYAML==6.0.3
+opencv-python-headless==5.0.0.93   # solo para los vídeos (video.enabled)

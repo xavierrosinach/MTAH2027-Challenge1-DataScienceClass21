@@ -1,0 +1,24 @@
+# --- Datos del partido: NUNCA en el repo (licencia, el repo es público) ---
+data/
+*.mp4
+*_atd.txt
+*_atd.xml
+*_homography.csv
+*_smart_tagging.xml
+
+# --- Generado por run.py ---
+cache/
+outputs/
+
+# --- Python / entorno ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# --- Sistema / editores ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
