@@ -9,6 +9,7 @@ partido completo, producir una etiqueta por frame indicando qué equipo tiene la
 ```
 config.yaml              todos los parámetros, comentados en castellano (empezar aquí)
 run.py                   datos + config -> CSV de entrega, comparación con las baselines y vídeos
+create_video_gt.py       vídeo de los 5 min públicos: etiqueta del GT y la nuestra lado a lado
 src/possession/
   config.py              carga config.yaml y resuelve rutas
   data.py                lee el tracking (ATD) y el Smart Tagging, con caché en cache/
@@ -117,6 +118,40 @@ tracking encima (círculos azules H, rojos A, balón amarillo, cruz gris = últi
 minimapa y **nuestra etiqueta en grande arriba a la derecha** con el color del equipo (gris = D).
 Cada bloque tarda ~1 minuto y ocupa ~120 MB. La primera vez se construyen las tablas de
 `data_proc.py` en `cache/` (~30 s). Necesita `opencv-python-headless`.
+
+## Vídeo comparado con el ground truth público
+
+```bash
+python create_video_gt.py                          # con config.yaml
+python create_video_gt.py --config mi_variante.yaml
+```
+
+Ejecuta el etiquetador con esa configuración (no escribe ningún CSV) y genera
+`outputs/videos/GT_vs_<config>.mp4`: los 5 minutos que tienen ground truth público (frames
+11185-18684), con el mismo vídeo, tracking y minimapa que los vídeos de revisión y, arriba a la
+derecha, **dos letras grandes: `GT` y `modelo`**. Cuando no coinciden, las dos llevan un **marco
+amarillo**. Además imprime cuántos frames difieren y el reparto H/A/D de cada uno:
+
+```
+ventana publica: frames 11185-18684 (7500 frames), distintos del GT: 1158 (15.4 %)
+  H: GT  3454   modelo  3824
+  A: GT  2577   modelo  2651
+  D: GT  1469   modelo  1025
+```
+
+Como el nombre del vídeo lleva el de la configuración, cada variante tiene el suyo y se pueden
+comparar. `--out ruta.mp4` cambia el destino. Tarda ~2 minutos. Usa las opciones de la sección
+`video` de la configuración (`mode`, `scale`, `minimap`), aunque `video.enabled` esté en `false`.
+
+**Para qué sirve y para qué no:** CHALLENGE.md presenta estos 5 minutos como la referencia de cómo
+se etiqueta cada situación (cuándo empieza una D, cuándo hay cambio de posesión). Sirve para
+entender la definición y convertir lo que se vea en reglas generales, que luego se comprueban en
+todo el partido. **No** sirve para ir tocando parámetros hasta que desaparezcan los marcos
+amarillos: son 17 posesiones, ajustar con ellas está prohibido (RULES.md) y empeora el resultado
+en el partido completo.
+
+También se puede activar en los vídeos de bloques con `video.public_gt: true` (solo tiene sentido
+en `1T_01`; el vídeo se guarda con el sufijo `_GT`).
 
 ## Datos
 
