@@ -32,8 +32,36 @@ oficiales. CSV actual: SHA256 `00bf726c…`, 270 posesiones (media 14,0 s).
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | worker Claude (`C:\MTAH2027\wt-idsse`) | desde 12-nov 18:10: descarga, cargador y GT; después, entrenar con 10 partidos y banco |
+| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | worker Claude (`C:\MTAH2027\wt-idsse`) | hecho: datos y v5all (ver la regla abajo). Ahora: corregir el sentido de ataque, reentrenar v6 y bancos |
 | Constantes de reglas revisadas con el modelo aprendido: pases, golpeos y costes de muerto | `exp/reglas` | worker Claude (`C:\MTAH2027\wt-reglas`) | desde 12-nov 19:05: diagnóstico con errors.py y barridos |
+
+### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
+
+Primera ronda de `exp/idsse`: v5all es v4 entrenado con 10 partidos (3 Metrica + 7 IDSSE).
+- **Banco de Metrica:** +0.0029 (error típico 0.0022). light −0.002, 6/12 celdas: no pasa la
+  regla de siempre. Por partido: el 3 sube +0.017; el 1 baja −0.005 y el 2 −0.004.
+- **Banco DFL (7 partidos):** +0.034, 28/28 celdas.
+
+El banco de Metrica favorece a los modelos entrenados solo con Metrica: la copia LOGO de v4
+aprende de 2 partidos del mismo proveedor y formato que el partido evaluado, y BAR-ATH nunca
+tendrá eso. El partido 3, el más distinto, ya se usaba como el mejor sustituto de un partido no
+visto (EXPERIMENTS #5). El GT de IDSSE se construye como el oficial: estado y posesión del balón
+del propio tracking.
+
+Además, el worker encontró un fallo: el sentido de ataque se deduce de "media x del local < 0,5"
+y falla en la 1.ª parte de un partido IDSSE. Comprobado sin etiquetas: en BAR-ATH y en Metrica
+acierta en todas las partes. Se corrige comparando las medias de los dos equipos. En BAR-ATH no
+cambia nada (hay que comprobar el mismo hash del CSV).
+
+**v6 = v4 + 7 IDSSE con el sentido corregido.** Se acepta solo si se cumplen las 5 condiciones:
+- (a) Banco de 10 partidos, semillas 0-3: mejora en las 4 condiciones y en la mayoría de las 40
+  celdas, sin perder macroF1.
+- (b) Banco de Metrica solo: la diferencia media no baja de 0 y el partido 3 tampoco.
+- (c) Semillas 4-7: (a) y (b) mantienen el signo.
+- (d) `check_control` en BAR-ATH: confianza y cambios de signo por minuto dentro de lo visto con
+  v1-v4 (|llr| > 2 en el 76-82 % de los frames con balón; 6,4-7,7 cambios de signo por minuto).
+- (e) `check_bar`: entre 240 y 300 posesiones (v4: 270), y paradas y set pieces con parada sin
+  bajar.
 
 ## Experimentos cerrados
 
