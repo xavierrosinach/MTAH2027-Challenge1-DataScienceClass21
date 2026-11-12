@@ -166,8 +166,16 @@ bench's fine ground truth (2 of 17 under 2 s vs 27 %), so only the value that wi
 kept.
 
 Also tried (same run as 0.25): group `short` (the proximity features over +/- 0.5 s and the half
-second before / after) on #5: +0.0029 (se 0.0009), all 4 conditions but 9/12 cells. Small; to
-retry on top of #6.
+second before / after) on #5: +0.0029 (se 0.0009), all 4 conditions but 9/12 cells.
+
+Tried on top of #6 and not kept (paired vs #6, by condition light / degraded / +tags / +coarseGT):
+- `short`: -0.0003 overall (-0.001 / +0.002 / -0.001 / -0.002), 6/12 cells: what it added to #5 is
+  covered by the possession weighting.
+- `team_switch` 13: +0.0035 (+0.007 / +0.007 / +0.004 / **-0.003**), 8/12; 20: -0.0029 (-0.006 /
+  -0.006 / -0.005 / **+0.005**), 3/12. Cheaper hand-overs win with the fine ground truth and lose
+  with the coarse one, like stronger weighting: how finely to cut is a knob whose best value
+  depends on how fine the real ground truth is, which we cannot measure. 16 with p = 0.25 is the
+  setting that wins under both.
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 
