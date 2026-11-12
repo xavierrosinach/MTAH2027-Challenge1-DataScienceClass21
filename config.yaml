@@ -55,7 +55,7 @@ context:
   ball:                                # quién está más cerca del balón
     scale_m: 1.0                       # peso de cada equipo = exp(-distancia / 1 m)
     weight: 1.0                        # peso de esta evidencia
-    contact_m: 2.0                     # si nadie está a < 2 m, balón suelto: sin evidencia (sigue el último equipo)
+    contact_m: 1.0                     # si nadie está a < 2 m, balón suelto: sin evidencia (sigue el último equipo)
 
   tag_weight: 0.03                     # evidencia por frame de las fases de ataque del Smart Tagging (solo sin balón)
 
