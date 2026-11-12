@@ -15,6 +15,8 @@ python validation/calibrate.py [--grid]                              # how the d
 python validation/train_control.py                                   # learnt control model (models/control.json)
 python validation/check_control.py                                   # its features on BAR-ATH vs the bench (aggregates)
 python validation/errors.py --configs ref=a.yaml new=b.yaml          # where spellF1 is lost (oracles, durations, causes)
+python validation/check_bar.py --configs ref=a.yaml new=b.yaml       # label-free effect on BAR-ATH (stoppages, Smart Tagging)
+python validation/train_dead.py / check_dead.py                      # learnt dead-ball model (#7, rejected, off)
 ```
 
 Each control model file gets its own leave-one-game-out copies in
@@ -48,6 +50,12 @@ only what passes the decision rule is merged into `josep/mejoras`.
 that a change does not hinge on how short possessions are counted). 3 games x 4 degradation seeds.
 A change is kept only if its mean spellF1 improves under **every** condition and in most
 (condition, game) cells, without losing macroF1. Among passing values, a round one in a flat region.
+Then two transfer checks on BAR-ATH, label-free (learnt from #5 and #7):
+`check_control.py` / `check_dead.py` (the model's inputs and outputs look like the bench's), and
+`check_bar.py` (possessions, stoppages, share of Smart Tagging set pieces with a predicted stoppage:
+a change must not make these implausible). Game 3, the most different bench game, gets a look of
+its own. Exploratory runs on BAR-ATH go through `check_bar.py`, never `run.py` with the public
+table on.
 
 ## Results (current bench: commit b259b60)
 
@@ -176,6 +184,26 @@ Tried on top of #6 and not kept (paired vs #6, by condition light / degraded / +
   with the coarse one, like stronger weighting: how finely to cut is a knob whose best value
   depends on how fine the real ground truth is, which we cannot measure. 16 with p = 0.25 is the
   setting that wins under both.
+
+Entry 7, **rejected** (branch `exp/muerto`; code kept, off: `context.dead_model`): a dead-ball
+model learnt on the other games (`src/possession/dead.py`, `validation/train_dead.py`), a plain
+logistic regression on the signals the default dead-ball evidence uses (players' speed over several
+windows, where the ball was last / next seen, time since / until seen, ball speed, ball alone,
+nearest player) plus the default rules' output, replacing the default evidence. Held-out AUC
+0.957-0.979 vs 0.928-0.962 for the default.
+- Trained on `degraded` copies only: +0.0067 spellF1 but **-0.016 under `light`**, macroF1 -0.007.
+- Trained on `degraded` and `light` copies (`train_mix: [light]`): **+0.0171 spellF1 (se 0.0028),
+  all 4 conditions, 10/12 cells, macroF1 +0.001, alive/dead F1 +0.005; game 3 +0.03 to +0.05.**
+- **But it does not transfer to BAR-ATH** (`check_bar.py`, label-free): stoppages over the match
+  104 -> 93, dead share 40.6 -> 35.5 %, Smart Tagging set pieces with a predicted stoppage 96.6 ->
+  91.4 % (two throw-ins and a goal kick lost). A match has more stoppages, not fewer; the learnt
+  model is too ready to call play alive on our tracking, whose stoppages the degradation of the
+  bench imitates only coarsely. (`check_dead.py`: same feature scales, but its output flips sign
+  3.6 times per minute on BAR-ATH vs 2.9 on the bench.)
+- Process note: this candidate was first run on BAR-ATH with `run.py`, which prints the public
+  table; the decision rests on the label-free checks above, and exploratory runs now use
+  `check_bar.py`. The accepted #2-#6 pass `check_bar.py` unchanged: 103-104 stoppages, 96.6 % of
+  set pieces with a stoppage; possessions 246 (#3) -> 254 -> 267 -> 270 (#6).
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 

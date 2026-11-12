@@ -120,11 +120,11 @@ def score(gt, pred, pm):
             "alive_dead_f1": r["alive_dead_f1"], "team_acc": r["team_acc_gt_alive"]}
 
 
-def logo_dir(cfg, model_path):
-    """Where train_control.py writes the leave-one-game-out copies of a control model: one folder
-    per model file name, so versions with different features can be benched side by side."""
+def logo_dir(cfg, model_path, kind="control"):
+    """Where train_control.py / train_dead.py write the leave-one-game-out copies of a model: one
+    folder per model file name, so versions with different features can be benched side by side."""
     stem = os.path.splitext(os.path.basename(model_path))[0]
-    return os.path.join(cfg["paths"]["output_dir"], "validation", "control", stem)
+    return os.path.join(cfg["paths"]["output_dir"], "validation", kind, stem)
 
 
 def load_config_for_game(path, game):
@@ -138,6 +138,11 @@ def load_config_for_game(path, game):
             if not os.path.isfile(m):
                 raise FileNotFoundError("run validation/train_control.py first: " + m)
         ctl["model"], ctl["ensemble"] = logo[0], logo[1:]
+    dm = cfg["context"].get("dead_model") or {}
+    if dm.get("enabled"):
+        dm["model"] = os.path.join(logo_dir(cfg, dm["model"], "dead"), "logo_{}.json".format(game))
+        if not os.path.isfile(dm["model"]):
+            raise FileNotFoundError("run validation/train_dead.py first: " + dm["model"])
     return cfg
 
 

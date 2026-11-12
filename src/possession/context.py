@@ -337,16 +337,21 @@ def add_team_llr(e, llr):
     e[:, A] -= np.maximum(0.0, llr)
 
 
-def emissions(f, p_dead, cfg, proximity=True):
-    """(N, 3) log-likelihood scores for H, A, D (up to a per-frame constant)."""
+def emissions(f, p_dead, cfg, proximity=True, dead_llr=None):
+    """(N, 3) log-likelihood scores for H, A, D (up to a per-frame constant).
+
+    dead_llr: dead-vs-alive evidence from the learnt model (dead.py) replacing the default one."""
     c = cfg["context"]
     n = len(p_dead)
     e = np.zeros((n, 3))
 
     # dead vs alive
-    p = np.clip(p_dead, 1e-3, 1 - 1e-3)
-    llr_dead = np.clip(np.log(p / (1 - p)), -c["dead_llr_clip"], c["dead_llr_clip"])
-    e[:, D] += c["dead_weight"] * llr_dead + ball_dead_llr(f, cfg)
+    if dead_llr is not None:
+        e[:, D] += dead_llr
+    else:
+        p = np.clip(p_dead, 1e-3, 1 - 1e-3)
+        llr_dead = np.clip(np.log(p / (1 - p)), -c["dead_llr_clip"], c["dead_llr_clip"])
+        e[:, D] += c["dead_weight"] * llr_dead + ball_dead_llr(f, cfg)
 
     # ball at a player's feet: exp(-d/scale) per team, team share weighted by how close anyone is
     # (off when the learnt control model replaces it)
@@ -732,7 +737,17 @@ def label(tracking, ball, tags, cfg, blocks, frame_period=None, verbose=True):
     p_dead = predict_logistic(model, X)
 
     ctl = c.get("control") or {"enabled": False}
-    e = emissions(f, p_dead, cfg, proximity=not (ctl["enabled"] and ctl["replace_proximity"]))
+    dm = c.get("dead_model") or {"enabled": False}
+    learnt_dead = None
+    if dm["enabled"]:
+        # learnt dead-ball evidence (src/possession/dead.py), trained on other games
+        from . import dead
+        from .config import REPO_ROOT
+        dpath = dm["model"] if os.path.isabs(dm["model"]) else os.path.join(REPO_ROOT, dm["model"])
+        learnt_dead = dm["weight"] * np.clip(dead.dead_llr(f, ball_dead_llr(f, cfg), dpath),
+                                             -dm["clip"], dm["clip"])
+    e = emissions(f, p_dead, cfg, proximity=not (ctl["enabled"] and ctl["replace_proximity"]),
+                  dead_llr=learnt_dead)
     if ctl["enabled"]:
         # learnt "who controls the ball" (src/possession/control.py), trained on other games
         from . import control
