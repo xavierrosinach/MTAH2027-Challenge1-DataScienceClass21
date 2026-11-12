@@ -31,9 +31,9 @@ FPS = 25
 WINDOWS = (("now", 0, 0), ("past1", -25, -1), ("next1", 1, 25), ("c2", -50, 50))
 BALL_FEATURES = ("near1", "near2p5", "near6", "second2p5", "n5", "n10", "goalside")
 SHAPE_FEATURES = ("centre", "spread_x", "spread_y", "speed", "front", "back", "advance")
-# extra feature groups (context.control.features), each a function -> (names, E_H, E_A)
+# extra feature groups (context.control.features), each a function -> (names, E_H, E_A);
+# registered at the end of the module
 EXTRA = {}
-GROUPS = ("base",)
 
 
 def window_nanmean(x, lo, hi):
@@ -139,6 +139,121 @@ def team_features(tracking, ball, blocks, groups=("base",)):
         g_h = np.column_stack([g_h, e_h])
         g_a = np.column_stack([g_a, e_a])
     return names, g_h, g_a, seen
+
+
+# --- extra feature groups -------------------------------------------------------------------
+
+LONG_WINDOWS = (("past3", -75, -26), ("next3", 26, 75), ("c5", -125, 125))
+MOTION_WINDOWS = (("c05", -12, 12), ("past1", -25, -1), ("next1", 1, 25))
+TOUCH_WINDOWS = (("past2", -50, -1), ("next2", 1, 50), ("past5", -125, -51), ("next5", 51, 125))
+
+
+def _nearest(dist, team, t):
+    """(distances to team t's players, index of its nearest, distance of its nearest)."""
+    d = np.where(np.broadcast_to(team == t, dist.shape), dist, np.inf)
+    j = np.argmin(d, axis=1)
+    return d, j, d[np.arange(len(d)), j]
+
+
+def _windowed(x, ok, windows, prefix):
+    x = np.where(ok, x, np.nan)
+    cols = [window_nanmean(x, lo, hi) for _, lo, hi in windows]
+    return cols, ["{}_{}".format(prefix, w) for w, _, _ in windows]
+
+
+def _pack(per_team):
+    names = per_team[0][1]
+    return (names,) + tuple(np.nan_to_num(np.column_stack(c), nan=0.0) for c, _ in per_team)
+
+
+def _velocity(x, scale, lag=4):
+    """Finite-difference velocity in m/s of normalised positions (..., 2); NaN where unknown."""
+    v = np.full(x.shape, np.nan)
+    v[lag:] = (x[lag:] - x[:-lag]) * scale * FPS / lag
+    return v
+
+
+def _long(tracking, ball, blocks, seen, dist, team, sign_h):
+    """The base ball features over longer windows: 3 s before / after and +/- 5 s."""
+    length = tracking["pitch"][0]
+    P = tracking["players"]
+    bx = (ball[:, 0] - 0.5) * length
+    per_team = []
+    for t in (0, 1):
+        sgn = sign_h if t == 0 else -sign_h
+        d, _, d1 = _nearest(dist, team, t)
+        d1 = np.minimum(d1, 40.0)
+        visible = np.broadcast_to(team == t, dist.shape) & ~np.isnan(P[..., 0])
+        with np.errstate(invalid="ignore"):
+            fwd_p = (P[..., 0] - 0.5) * length * sgn[:, None]
+            behind = np.where(visible, fwd_p < (bx * sgn)[:, None], False).sum(axis=1)
+        raw = {"near2p5": np.exp(-d1 / 2.5), "near6": np.exp(-d1 / 6.0),
+               "n5": (d < 5).sum(axis=1).astype(float),
+               "goalside": behind / np.maximum(1, visible.sum(axis=1)),
+               "ballpos": bx * sgn / (length / 2)}
+        cols, names = [], []
+        for name, x in raw.items():
+            c, nm = _windowed(x, seen, LONG_WINDOWS, name)
+            cols += c
+            names += nm
+        per_team.append((cols, names))
+    return _pack(per_team)
+
+
+def _motion(tracking, ball, blocks, seen, dist, team, sign_h):
+    """How the players move against the ball: the nearest player's closing speed, whether the
+    ball moves with him (a carry), his speed, and how many team-mates run at the ball (pressing)."""
+    length, width = tracking["pitch"]
+    scale = np.array([length, width])
+    idx = np.arange(len(dist))
+    pv = _velocity(tracking["players"], scale)
+    bv = _velocity(ball, scale)
+    dn = np.where(np.isinf(dist), np.nan, dist)
+    closing = np.full(dist.shape, np.nan)
+    closing[4:] = -(dn[4:] - dn[:-4]) * FPS / 4
+    closing_ok = np.nan_to_num(closing, nan=-99.0)
+    per_team = []
+    for t in (0, 1):
+        d, j, d1 = _nearest(dist, team, t)
+        ok = seen & (d1 < 15)
+        v1 = pv[idx, j]
+        raw = {"close1": np.clip(closing[idx, j], -8, 8) / 4,
+               "carry1": np.exp(-np.hypot(*(v1 - bv).T) / 3),
+               "speed1": np.clip(np.hypot(*v1.T), 0, 10) / 5}
+        cols, names = [], []
+        for name, x in raw.items():
+            c, nm = _windowed(x, ok, MOTION_WINDOWS, name)
+            cols += c
+            names += nm
+        press = ((d < 12) & (closing_ok > 2)).sum(axis=1).astype(float)
+        c, nm = _windowed(press, seen, MOTION_WINDOWS, "press")
+        per_team.append((cols + c, names + nm))
+    return _pack(per_team)
+
+
+def _touch(tracking, ball, blocks, seen, dist, team, sign_h):
+    """Who is in control around each frame: share of frames where the team's nearest player is
+    within 2 m and nearer than the rival's, before and after, and how long since / until its last /
+    next such frame (possession stays with the last team in control)."""
+    n = len(dist)
+    idx = np.arange(n)
+    d1s = [_nearest(dist, team, t)[2] for t in (0, 1)]
+    per_team = []
+    for t in (0, 1):
+        ctrl = seen & (d1s[t] < 2.0) & (d1s[t] < d1s[1 - t])
+        cols, names = _windowed(ctrl.astype(float), seen, TOUCH_WINDOWS, "ctrl")
+        last = np.maximum.accumulate(np.where(ctrl, idx, -10 ** 9))
+        nxt = np.minimum.accumulate(np.where(ctrl, idx, 10 ** 9)[::-1])[::-1]
+        since = np.minimum((idx - last) / FPS, 10.0)
+        until = np.minimum((nxt - idx) / FPS, 10.0)
+        cols += [np.exp(-since / 2), np.exp(-until / 2)]
+        names += ["ctrl_since", "ctrl_until"]
+        per_team.append((cols, names))
+    return _pack(per_team)
+
+
+EXTRA.update({"long": _long, "motion": _motion, "touch": _touch})
+GROUPS = ("base",) + tuple(EXTRA)
 
 
 def fit(X, y, l2=1.0, iters=60):

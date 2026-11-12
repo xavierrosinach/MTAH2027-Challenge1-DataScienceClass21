@@ -58,7 +58,8 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 | 0 | official baseline_smooth50 | 0.360 | 0.303 | 0.303 | 0.310 | 0.319 | 0.769 | ~590 | floor |
 | 1 | main 6791db5 (Xavier, Viterbi) | 0.507 | 0.404 | 0.435 | 0.473 | 0.455 | 0.812 | ~215 | reference |
 | 2 | #1 + `team_switch` 20 -> 16 | 0.520 | 0.415 | 0.443 | 0.476 | 0.463 | 0.812 | ~237 | kept |
-| 3 | #2 + learnt control model (`context.control`, weight 1) | 0.609 | 0.540 | 0.565 | 0.617 | **0.583** | **0.847** | ~244 | **kept** |
+| 3 | #2 + learnt control model (`context.control`, weight 1) | 0.609 | 0.540 | 0.565 | 0.617 | 0.583 | 0.847 | ~244 | kept |
+| 4 | #3 + movement features (`features: [base, motion]`) | 0.615 | 0.555 | 0.579 | 0.629 | **0.594** | **0.849** | ~250 | **kept** |
 
 Entry 2: +0.009 spellF1, better under all 4 conditions (worst +0.003), 10/12 cells, games 1 and 3 up,
 game 2 flat (-0.003). The reference under-segments (215 predicted vs 384 true possessions); a
@@ -100,6 +101,23 @@ controls the ball, learnt on the other games:
 - Tried on top and not kept (all within +-0.006, i.e. bench noise): `team_switch` 10 / 13 / 20 / 24
   (+0.006 but loses coarseGT / +0.004 / -0.006 / -0.010); gap model weight 0.1 / 0.3 / 0.6
   (+0.001 / +0.003 / +0.003); keeping the nearest-player evidence as well (-0.000, 5/12).
+
+Entry 4 (branch `exp/rasgos`): **+0.0115 spellF1 (paired over the 48 runs: sd 0.009, standard
+error 0.0014, 88 % of runs better), +0.002 macroF1, better under all 4 conditions (light +0.006,
+degraded +0.015, +tags +0.014, coarseGT +0.012), 11/12 cells** (the one below: game 3 under
+`light`, -0.005). New group `motion` in `control.py`, per team, over +/- 0.5 s, the second before and
+the second after: closing speed of its nearest player towards the ball, whether the ball moves with
+him (exp(-|v_player - v_ball| / 3 m/s): a carry), his speed, and how many of its players within
+12 m run at the ball faster than 2 m/s (pressing). Held-out per-frame accuracy 92.6-93.1 %
+(base 92.4-92.6 %). Same signal on BAR-ATH (`check_control.py`, label-free): every motion feature
+has the same scale (90th percentile ratio 0.99-1.09, medians within 0.92-1.04x), the model as
+confident (|llr| > 2 on 79 % vs 80 % of frames with ball). Model file `models/control_v2.json`.
+
+Tried in the same run and not kept (paired mean vs #3, cells better):
+`long` (base features over 3 s before / after and +/- 5 s): -0.002, 7/12; `touch` (share of
+frames in control before / after, time since / until the team's last / next control): -0.003,
+3/12; all three groups together: +0.009, 11/12 but below `motion` alone and +0.001 under `light`.
+The linear model gains little from more of the same evidence; what it lacked was how players move.
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 
