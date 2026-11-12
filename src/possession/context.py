@@ -373,6 +373,24 @@ def emissions(f, p_dead, cfg, proximity=True, dead_llr=None):
     return e
 
 
+def home_attack_sign(tracking, blocks):
+    """+1 on the frames of a block where the home team attacks towards x = 1, -1 towards x = 0.
+
+    Relative reading, as in keeper_teams: the team whose players stand nearer x = 0 on average
+    over the block defends x = 0. (Reading "home mean x < 0.5" fails when the home team spends a
+    half pushed past the half-way line.) Frames outside the blocks get +1.
+    """
+    P, team = tracking["players"], tracking["team"]
+    sign = np.ones(len(P))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for _, first, last in blocks:
+            home_x = np.nanmean(P[first:last + 1, team == 0, 0])
+            away_x = np.nanmean(P[first:last + 1, team == 1, 0])
+            sign[first:last + 1] = 1 if home_x < away_x else -1
+    return sign
+
+
 def team_shape_features(tracking, blocks, smooth_frames):
     """Per frame, how each team is laid out and moving, with x towards its attacking goal.
 
@@ -383,12 +401,7 @@ def team_shape_features(tracking, blocks, smooth_frames):
     team = tracking.get("team_frame", tracking["team"][None, :])
     length, width = tracking["pitch"]
     n = len(P)
-    sign = np.ones(n)                                  # +1: home attacks towards x = 1
-    for _, first, last in blocks:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            home_x = np.nanmean(P[first:last + 1, tracking["team"] == 0, 0])
-        sign[first:last + 1] = 1 if home_x < 0.5 else -1
+    sign = home_attack_sign(tracking, blocks)          # +1: home attacks towards x = 1
 
     cols = []
     with warnings.catch_warnings():

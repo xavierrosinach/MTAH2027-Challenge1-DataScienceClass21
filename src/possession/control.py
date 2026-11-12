@@ -21,7 +21,6 @@ look like ours (validation/degrade.py). Never on BAR-ATH. The weights are stored
 """
 
 import json
-import warnings
 
 import numpy as np
 
@@ -49,15 +48,10 @@ def window_nanmean(x, lo, hi):
 
 
 def attack_sign(tracking, blocks):
-    """+1 on frames where the home team attacks towards x = 1, -1 where towards x = 0."""
-    P = tracking["players"]
-    sign = np.ones(len(P))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for _, first, last in blocks:
-            home_x = np.nanmean(P[first:last + 1, tracking["team"] == 0, 0])
-            sign[first:last + 1] = 1 if home_x < 0.5 else -1
-    return sign
+    """+1 on frames where the home team attacks towards x = 1, -1 where towards x = 0
+    (context.home_attack_sign: relative reading, home mean x below the away team's)."""
+    from .context import home_attack_sign
+    return home_attack_sign(tracking, blocks)
 
 
 def feature_groups(cfg):
