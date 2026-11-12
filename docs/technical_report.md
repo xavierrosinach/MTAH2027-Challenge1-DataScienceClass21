@@ -135,7 +135,12 @@ rule-based version, to **0.613**, with macroF1 0.852.
   - The map is in EXPERIMENTS.md.
 - **Use of an AI assistant.** Part of the code was written with an AI coding assistant. In line
   with the competition terms, it never received match data, video or extracts. It worked on code
-  and on aggregate metrics printed by scripts run locally.
+  and on aggregate metrics printed by scripts run locally. This is enforced, not only instructed:
+  a local hook runs before every action of the assistant and blocks reading the match data, its
+  caches, the public ground truth and the submission file.
+- **Rules gate.** Before any merge, `validation/check_rules.py` checks the change: no data-like
+  files in the repository, no new dependencies, no integer constant in the code that could be a
+  frame of the match, and models trained only on approved games.
 
 ## 3. Assets: used and dropped
 

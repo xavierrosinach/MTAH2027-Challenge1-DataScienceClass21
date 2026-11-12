@@ -65,5 +65,11 @@ Si un agente rompe el protocolo, se anota aquí con lo que vio y cómo se resolv
 
 ## Para Josep (avisos y decisiones pendientes)
 
-- Documento técnico: decidir si se mantienen la línea sobre el asistente de IA y la del desliz con
-  la tabla pública (§2.4), y añadir los nombres de los 4 miembros.
+Responde siempre en `C:\MTAH2027\DECISIONES_JOSEP.md`, a mano: es lo único que cuenta como
+aprobación y ningún agente puede escribirlo.
+
+- **Datos de otros partidos:** está propuesta una política general (datasets públicos sin registro
+  y con licencia abierta). Para activarla, cambia PENDIENTE por APROBADA en DECISIONES_JOSEP.md.
+  Mientras tanto, la línea 1 de la cola queda aparcada y se sigue con las demás.
+- **Documento técnico:** decidir si se mantienen la línea sobre el asistente de IA y la del desliz
+  con la tabla pública (§2.4), y añadir los nombres de los 4 miembros.

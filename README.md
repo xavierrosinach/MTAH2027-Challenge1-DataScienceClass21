@@ -18,8 +18,26 @@ src/possession/
   submission.py          escribe el CSV, validador oficial y tabla comparativa
   data_proc.py           cruza ATD + Smart Tagging + homografía en tablas (las usan los vídeos)
   video.py               vídeos de revisión con el tracking y nuestra etiqueta
+  control.py             modelo aprendido de quién controla el balón (entrenado en otros partidos)
+  dead.py                modelo aprendido de balón muerto (probado y descartado, apagado)
+models/                  pesos de los modelos aprendidos (JSON; run.py no necesita entrenar nada)
+validation/              banco de validación en otros partidos (Metrica) y comprobaciones sin etiquetas
 docs/technical_report.md documento técnico (entregable)
+PROGRESS.md              panel de progreso: mejor versión, experimentos, cola de ideas, avisos
+EXPERIMENTS.md           registro detallado de cada experimento y de cómo se decide
 ```
+
+## Cómo está organizado el trabajo
+
+- `main`: la versión oficial; solo cambia cuando el equipo lo decide.
+- `josep/mejoras`: la mejor versión hasta ahora; aquí se fusiona cada mejora validada.
+- `exp/<idea>`: una rama por experimento, solo mientras está abierto.
+- Cada experimento cerrado queda como **etiqueta** (pestaña "Tags" de GitHub):
+  `aceptado/<grupo>/<idea>` o `descartado/<grupo>/<idea>`. Las descartadas se pueden reproducir
+  con `git checkout <etiqueta>` y `python run.py --no-public`. La tabla completa está en
+  EXPERIMENTS.md.
+- `python run.py --no-public` regenera el CSV sin mostrar la tabla de los 5 minutos públicos e
+  imprime su SHA256. `python validation/check_rules.py` comprueba las reglas antes de fusionar.
 
 ## Requisitos
 
