@@ -1,0 +1,42 @@
+# Validation bench on the IDSSE games only (python validation/bench.py --bench validation/bench_dfl.yaml).
+# Not used to build the submission. Other matches, never BAR-ATH.
+# Data: IDSSE (Bassek et al. 2025, Scientific Data), DOI 10.6084/m9.figshare.28196177, CC BY 4.0:
+#   python validation/idsse.py download    (-> ../external/idsse, never in the repo)
+# Ground truth: the tracking's own BallStatus (0 = dead) and BallPossession (1 home / 2 guest), the
+# same construction as the challenge's ground truth (validation/idsse.py ground_truth).
+# Everything else (degradation, tags, suite) is the same as validation/bench.yaml.
+
+metrica_dir: ../external/metrica-sample-data
+idsse_dir: ../external/idsse
+games: [IDSSE_J03WMX, IDSSE_J03WN1, IDSSE_J03WOH, IDSSE_J03WOY, IDSSE_J03WPY, IDSSE_J03WQQ, IDSSE_J03WR9]
+
+tags: none
+synthetic_tags:             # SET PIECES stand-in from the DFL restart events (validation/idsse.py)
+  lead_s: 4
+  recall: 0.8
+
+degrade:                    # as validation/bench.yaml
+  enabled: true
+  seeds: [0, 1, 2, 3]
+  noise_m: 0.0
+  players:
+    enabled: true
+    fragment_median_s: 35
+    gap_median_s: 1.0
+  ball_noise:
+    sigma_m: 1.2
+    corr_s: 1.0
+  ball_lost_early_s: 0.6
+  ball_live_gaps:
+    per_min: 0.5
+    median_s: 8.0
+
+gt:
+  min_spell_s: 0.0
+
+suite:
+  light: {tags: none, degrade: {ball_noise: {sigma_m: 0.6}, ball_lost_early_s: 0.0,
+                                ball_live_gaps: {per_min: 0.0}}}
+  degraded: {tags: none}
+  degraded+tags: {tags: events}
+  degraded+coarseGT: {tags: none, gt: {min_spell_s: 2.0}}

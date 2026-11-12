@@ -95,10 +95,11 @@ def _load_epts_game(folder, game):
     return ball, players, team, period
 
 
-def player_speed(players, smooth=2):
-    """Per slot speed (m/s) from positions smoothed over +/- smooth frames; NaN where unseen."""
+def player_speed(players, smooth=2, pitch=PITCH):
+    """Per slot speed (m/s) from positions smoothed over +/- smooth frames; NaN where unseen.
+    pitch: (length, width) in m of the 0-1 coordinates (Metrica's by default)."""
     n = len(players)
-    pos = players * np.array(PITCH)
+    pos = players * np.array(pitch)
     ok = ~np.isnan(pos[..., 0])
     c = np.concatenate([np.zeros((1,) + pos.shape[1:]), np.cumsum(np.nan_to_num(pos), axis=0)])
     cn = np.concatenate([np.zeros((1, pos.shape[1])), np.cumsum(ok, axis=0)])

@@ -1,0 +1,11 @@
+# Games of OTHER matches approved for training and validation (R4, PROTOCOLO_AGENTES.md), besides
+# the Metrica sample games. One glob pattern per line; validation/check_rules.py reads it.
+#
+# IDSSE_* : the 7 matches of IDSSE (Bundesliga / 2. Bundesliga 2022/23). Bassek, Rein, Weber,
+#   Memmert (2025), "An integrated dataset of spatiotemporal and event data in elite soccer",
+#   Scientific Data. DOI 10.6084/m9.figshare.28196177, licence CC BY 4.0, public download without
+#   registration. Tracking: TRACAB (Sportec Solutions for the DFL); events: official DFL event data
+#   (human operators). Approved by the general policy of C:\MTAH2027\DECISIONES_JOSEP.md (12-nov,
+#   Josep: public download without registration and an explicit open licence). Loader:
+#   validation/idsse.py (only these 7 match ids exist).
+IDSSE_*

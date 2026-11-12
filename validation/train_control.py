@@ -1,10 +1,12 @@
-"""Train the learnt control model (src/possession/control.py) on the Metrica sample games.
+"""Train the learnt control model (src/possession/control.py) on the games of a bench file.
 
-    python validation/train_control.py
+    python validation/train_control.py                                  # Metrica (bench.yaml)
+    python validation/train_control.py --bench validation/bench_all.yaml # Metrica + IDSSE
 
-Training data: every live frame (event-derived ground truth, validation/gt_events.py) of the
-Metrica games, with their tracking degraded as in the bench's `degraded` condition, with seeds the
-bench does not use. Writes
+Training data: every live frame of the bench games (Metrica: event-derived ground truth,
+validation/gt_events.py; IDSSE: the tracking's BallStatus / BallPossession, validation/idsse.py),
+with their tracking degraded as in the bench's `degraded` condition, with seeds the bench does not
+use. Writes
   - models/control.json: trained on all the games; the one run.py uses on BAR-ATH;
   - outputs/validation/control/<model name>/logo_<game>.json: trained without <game>. The bench uses it to
     label <game>, so no score of the bench comes from a game the model was trained on.
@@ -25,8 +27,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bench as B  # noqa: E402  (sets the paths)
 import degrade as deg  # noqa: E402
-import gt_events  # noqa: E402
-import metrica  # noqa: E402
 from possession import context, control  # noqa: E402
 from possession.config import load_config  # noqa: E402
 
@@ -38,9 +38,7 @@ def game_data(job):
     """(names, X, y, seen, nearest_h) on the live frames of one degraded game."""
     game, seed, bench, cfg_path = job
     cfg = load_config(cfg_path)
-    tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cfg["paths"]["cache_dir"])
-    gt, blocks = gt_events.ground_truth(metrica.load_events(bench["metrica_dir"], game),
-                                        tr["n_frames"])
+    tr, _, gt, blocks = B.load_game(bench, game, cfg["paths"]["cache_dir"])
     tr = deg.degrade(tr, gt, bench["degrade"], seed)
     ball = context.interpolate_ball(tr["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
     tr = dict(tr)
@@ -113,7 +111,7 @@ def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, ar
         held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED][0]
         rows.append(evaluate(models, held, cfg["context"]["ball"]["contact_m"]))
     with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
-        print("\n{} ({}): held-out game (trained on the other two), live frames:".format(
+        print("\n{} ({}): held-out game (trained on the other games), live frames:".format(
             os.path.basename(out), "mlp" if mlp is not None else "logit"))
         print(pd.DataFrame(rows).set_index("game").to_string())
     if args.no_save:

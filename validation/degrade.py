@@ -99,5 +99,6 @@ def degrade(tracking, gt_labels, cfg, seed):
     if b.get("per_min", 0) > 0:
         ball = add_ball_gaps(ball, np.isin(gt_labels, ["H", "A"]), rng, b["per_min"],
                              b["median_s"])
-    out.update(players=players, team=team, ball=ball, speed=player_speed(players))
+    out.update(players=players, team=team, ball=ball,
+               speed=player_speed(players, pitch=tracking["pitch"]))
     return out

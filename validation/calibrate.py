@@ -8,6 +8,7 @@ Two kinds of targets, neither of which is ground truth:
 
     python validation/calibrate.py                      # BAR-ATH stats + the current bench.yaml
     python validation/calibrate.py --grid               # also a small grid of live-gap settings
+    python validation/calibrate.py --bench validation/bench_dfl.yaml [--clean]   # IDSSE games
 """
 
 import argparse
@@ -23,8 +24,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bench as B  # noqa: E402  (sets the paths)
 import degrade as deg  # noqa: E402
-import gt_events  # noqa: E402
-import metrica  # noqa: E402
 from possession.config import load_config  # noqa: E402
 from possession.context import edge_distance_m  # noqa: E402
 
@@ -50,7 +49,7 @@ def ball_stats(tr, blocks):
         s, e = _runs(~seen[a:b + 1])
         starts += list(s + a)
         ends += list(e + a)
-    starts, ends = np.array(starts), np.array(ends)
+    starts, ends = np.array(starts, dtype=int), np.array(ends, dtype=int)
     long_ = ((ends - starts) >= 125) & (starts > 0)
     minutes = graded.sum() / 25 / 60
     s = graded & seen
@@ -87,9 +86,7 @@ def bench_stats_and_baselines(bench, cfg, seed=0):
     smooth = B._official_smooth(cfg["paths"]["official_repo"])
     stats, scores = [], []
     for game in bench["games"]:
-        tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cfg["paths"]["cache_dir"])
-        gt, blocks = gt_events.ground_truth(metrica.load_events(bench["metrica_dir"], game),
-                                            tr["n_frames"])
+        tr, _, gt, blocks = B.load_game(bench, game, cfg["paths"]["cache_dir"])
         if bench["degrade"]["enabled"]:
             tr = deg.degrade(tr, gt, bench["degrade"], seed)
         stats.append(ball_stats(tr, blocks))
@@ -113,10 +110,14 @@ def main():
     parser.add_argument("--bench", default=os.path.join(HERE, "bench.yaml"))
     parser.add_argument("--config", default=os.path.join(B.REPO, "config.yaml"))
     parser.add_argument("--grid", action="store_true")
+    parser.add_argument("--clean", action="store_true",
+                        help="statistics of the bench games without degradation")
     args = parser.parse_args()
     cfg = load_config(args.config)
     sys.path.insert(0, os.path.join(cfg["paths"]["official_repo"], "evaluation"))
     bench = B.load_bench(args.bench)
+    if args.clean:
+        bench["degrade"]["enabled"] = False
 
     pd.set_option("display.width", 200)
     print("BAR-ATH (label-free aggregates):")

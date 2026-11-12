@@ -31,6 +31,7 @@ for p in (HERE, os.path.join(REPO, "src")):
 
 import degrade as deg  # noqa: E402
 import gt_events  # noqa: E402
+import idsse  # noqa: E402
 import metrica  # noqa: E402
 from possession.config import load_config  # noqa: E402
 
@@ -46,9 +47,27 @@ PUBLISHED = {"baseline_raw": (0.6532, 0.0486), "baseline_smooth25": (0.6752, 0.1
 def load_bench(path):
     with open(path, encoding="utf-8") as handle:
         b = yaml.safe_load(handle)
-    root = b["metrica_dir"]
-    b["metrica_dir"] = root if os.path.isabs(root) else os.path.normpath(os.path.join(REPO, root))
+    for key in ("metrica_dir", "idsse_dir"):
+        root = b.get(key)
+        if root is not None:
+            b[key] = root if os.path.isabs(root) else os.path.normpath(os.path.join(REPO, root))
     return b
+
+
+def load_game(bench, game, cache_dir, min_spell_s=0.0):
+    """(tracking, events, gt, blocks) of one bench game, from its source by name: IDSSE_<id>
+    (validation/idsse.py, ground truth = the tracking's BallStatus / BallPossession) or a Metrica
+    sample game (validation/metrica.py, ground truth derived from the events)."""
+    if idsse.is_idsse(game):
+        root = bench["idsse_dir"]
+        tr = idsse.load_tracking(root, game)
+        events = idsse.load_events(root, game)
+        gt, blocks = idsse.ground_truth(root, game, min_spell_s)
+        return tr, events, gt, blocks
+    tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cache_dir)
+    events = metrica.load_events(bench["metrica_dir"], game)
+    gt, blocks = gt_events.ground_truth(events, tr["n_frames"], min_spell_s)
+    return tr, events, gt, blocks
 
 
 # --- inputs the labeller expects ----------------------------------------------------------
@@ -127,16 +146,30 @@ def logo_dir(cfg, model_path, kind="control"):
     return os.path.join(cfg["paths"]["output_dir"], "validation", kind, stem)
 
 
+def _trained_on(model_path):
+    """Training games recorded in a model file (info.games)."""
+    import json
+    with open(model_path, encoding="utf-8") as fh:
+        return list((json.load(fh).get("info") or {}).get("games") or [])
+
+
 def load_config_for_game(path, game):
-    """A labeller config whose learnt control model (if any) was trained WITHOUT this game."""
+    """A labeller config whose learnt control model (if any) was trained WITHOUT this game: its
+    leave-one-game-out copy, or the full model itself when its recorded training games do not
+    include this game (e.g. a model trained on Metrica only, benched on an IDSSE game)."""
     cfg = load_config(path)
     ctl = cfg["context"].get("control") or {}
     if ctl.get("enabled"):
-        logo = [os.path.join(logo_dir(cfg, m), "logo_{}.json".format(game))
-                for m in [ctl["model"]] + list(ctl.get("ensemble") or [])]
-        for m in logo:
-            if not os.path.isfile(m):
-                raise FileNotFoundError("run validation/train_control.py first: " + m)
+        logo = []
+        for m in [ctl["model"]] + list(ctl.get("ensemble") or []):
+            copy = os.path.join(logo_dir(cfg, m), "logo_{}.json".format(game))
+            full = m if os.path.isabs(m) else os.path.join(REPO, m)
+            if os.path.isfile(copy):
+                logo.append(copy)
+            elif os.path.isfile(full) and game not in _trained_on(full) and _trained_on(full):
+                logo.append(full)
+            else:
+                raise FileNotFoundError("run validation/train_control.py first: " + copy)
         ctl["model"], ctl["ensemble"] = logo[0], logo[1:]
     dm = cfg["context"].get("dead_model") or {}
     if dm.get("enabled"):
@@ -148,10 +181,8 @@ def load_config_for_game(path, game):
 
 def load_case(game, seed, bench, cache_dir):
     """(tracking, events, gt, blocks, tags) of one game under one degradation seed."""
-    tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cache_dir)
-    events = metrica.load_events(bench["metrica_dir"], game)
-    gt, blocks = gt_events.ground_truth(events, tr["n_frames"],
-                                        (bench.get("gt") or {}).get("min_spell_s", 0.0))
+    tr, events, gt, blocks = load_game(bench, game, cache_dir,
+                                       (bench.get("gt") or {}).get("min_spell_s", 0.0))
     if seed is not None:
         tr = deg.degrade(tr, gt, bench["degrade"], seed)
     tags = (synthetic_tags(events, blocks, bench["synthetic_tags"], 0 if seed is None else seed)
