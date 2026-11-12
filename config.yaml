@@ -68,8 +68,8 @@ context:
 
   control:                             # modelo aprendido de quién controla el balón (src/possession/control.py)
     enabled: true                      # entrenado en OTROS partidos (validation/train_control.py); EXPERIMENTS.md #3
-    model: models/control_v2.json      # pesos (Metrica sample games, tracking degradado; nunca BAR-ATH)
-    features: [base, motion]           # grupos de rasgos (control.py): base + movimiento de los jugadores
+    model: models/control_long.json    # pesos (Metrica sample games, tracking degradado; nunca BAR-ATH)
+    features: [base, long]             # grupos de rasgos (control.py): base + movimiento de los jugadores
                                        #   respecto al balón (EXPERIMENTS.md #4); long y touch, descartados
     replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
     weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
