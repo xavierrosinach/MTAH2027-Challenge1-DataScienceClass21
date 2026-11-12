@@ -89,7 +89,8 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
     players    players DataFrame from data_proc
     mode       "overlay" (video + tracking) or "pitch" (2D only)
     scale      output size vs 1920x1080 (overlay) -- 0.5 = 960x540
-    label_col  optional column in sel to show (e.g. your predicted label)
+    label_col  optional column (or list of columns) in sel to show as big letters, top right,
+               left to right in the given order; when two differ they get a yellow frame
     step       keep 1 frame every `step`
     """
     import cv2
@@ -118,7 +119,8 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
     b_xm, b_ym = last_x * games.GAMES["BAR-ATH"]["pitch"][0], last_y * games.GAMES["BAR-ATH"]["pitch"][1]
 
     tags_txt = _active_tags(sel)
-    labels = sel[label_col].astype(str).to_numpy() if label_col else None
+    cols = [label_col] if isinstance(label_col, str) else list(label_col or [])
+    labels = {c: sel[c].astype(str).to_numpy() for c in cols}
 
     # canvas
     if mode == "overlay":
@@ -195,20 +197,29 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
         status = "ball seen" if seen[i] else (
             "BALL LOST {:.1f}s".format((f - last_f[i]) / 25) if not np.isnan(last_f[i]) else "BALL LOST")
         line1 = "{} {}  |  frame {}  |  {}".format(sel["period"].iat[i], sel["clock"].iat[i], f, status)
-        if labels is not None:
-            line1 += "  |  {}: {}".format(label_col, labels[i])
+        for c in cols:
+            line1 += "  |  {}: {}".format(c, labels[c][i])
         bar_h = int(52 * fs / 0.55)
         cv2.rectangle(canvas, (0, 0), (out_w, bar_h), (0, 0, 0), -1)
         cv2.putText(canvas, line1, (8, int(bar_h * 0.42)), font, fs, WHITE, 1, cv2.LINE_AA)
         cv2.putText(canvas, tags_txt[i][:160], (8, int(bar_h * 0.88)), font, fs * 0.8, BALL, 1, cv2.LINE_AA)
-        if labels is not None:
-            # big label letter, top right, in the team colour (grey = dead ball)
-            lab = labels[i]
+        # big label letters, top right, in the team colour (grey = dead ball, black = X)
+        box = int(out_h * 0.16)
+        title_h = int(box * 0.28) if len(cols) > 1 else 0
+        differ = len(cols) > 1 and len({labels[c][i] for c in cols}) > 1
+        for j, c in enumerate(cols):
+            lab = labels[c][i]
             colour = {"H": HOME, "A": AWAY, "D": (110, 110, 110)}.get(lab, (0, 0, 0))
-            box = int(out_h * 0.16)
-            x1, y1 = out_w - 8, bar_h + 8 + box
-            cv2.rectangle(canvas, (x1 - box, bar_h + 8), (x1, y1), colour, -1)
-            cv2.rectangle(canvas, (x1 - box, bar_h + 8), (x1, y1), WHITE, 2)
+            x1 = out_w - 8 - (len(cols) - 1 - j) * (box + 8)
+            y0 = bar_h + 8
+            y1 = y0 + title_h + box
+            cv2.rectangle(canvas, (x1 - box, y0), (x1, y1), colour, -1)
+            cv2.rectangle(canvas, (x1 - box, y0), (x1, y1), BALL if differ else WHITE,
+                          5 if differ else 2)
+            if title_h:
+                (tw, th), _ = cv2.getTextSize(c, font, fs, 1)
+                cv2.putText(canvas, c, (x1 - box + (box - tw) // 2, y0 + title_h - 4), font, fs,
+                            WHITE, 1, cv2.LINE_AA)
             scale_txt = box / 40
             (tw, th), _ = cv2.getTextSize(lab, font, scale_txt, 3)
             cv2.putText(canvas, lab, (x1 - box + (box - tw) // 2, y1 - (box - th) // 2), font,
@@ -227,32 +238,51 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
     return out_path
 
 
-def render_blocks(cfg, labels, tracking):
-    """Videos of the graded match in blocks of `video.block_minutes`, with our labels on top.
+GT_FILE = os.path.join("evaluation", "gt", "BAR-ATH_possession_gt_public.csv")
 
-    Each block is outputs/videos/<half>T_<nn>_<from>-<to>.mp4 (match clock). `video.blocks` picks
-    which ones by name prefix ("1T_01", "2T", ...); an empty list renders them all. Goalkeeper
-    tracks are coloured by the goal they guard, the same fix the labeller applies.
+
+def video_tables(cfg, labels, tracking, public_gt=False):
+    """Frames and players tables for make_video, with our labels (and the public GT) as columns.
+
+    Goalkeeper tracks are coloured by the goal they guard, the same fix the labeller applies.
+    Returns (frames, players, label columns to show).
     """
     import games
     from possession.context import keeper_teams
     from possession.data_proc import load_all
 
-    vc = cfg["video"]
-    game_blocks = games.half_video_blocks("BAR-ATH")
     d = load_all(cfg)
     frames, players = d["frames"].copy(), d["players"].copy()
-    frames["label"] = labels
+    frames["modelo"] = labels
+    shown = ["modelo"]
+    if public_gt:
+        # official public ground truth (5 min): only to understand how situations are labelled,
+        # never to tune parameters (RULES.md)
+        gt = pd.read_csv(os.path.join(cfg["paths"]["official_repo"], GT_FILE))["label"].to_numpy()
+        frames["GT"] = gt
+        shown = ["GT", "modelo"]
     if cfg["context"]["keepers"]["enabled"]:
-        T, _ = keeper_teams(tracking, game_blocks, cfg)
+        T, _ = keeper_teams(tracking, games.half_video_blocks("BAR-ATH"), cfg)
         t = T[players["frame"].to_numpy(), players["slot"].to_numpy() - 1]
         players["team"] = pd.Categorical(np.where(t == 0, "H", "A"))
+    return frames, players, shown
 
+
+def render_blocks(cfg, labels, tracking):
+    """Videos of the graded match in blocks of `video.block_minutes`, with our labels on top.
+
+    Each block is outputs/videos/<half>T_<nn>_<from>-<to>.mp4 (match clock). `video.blocks` picks
+    which ones by name prefix ("1T_01", "2T", ...); an empty list renders them all.
+    """
+    import games
+
+    vc = cfg["video"]
+    frames, players, shown = video_tables(cfg, labels, tracking, vc.get("public_gt"))
     out_dir = os.path.join(cfg["paths"]["output_dir"], "videos")
     size = int(vc["block_minutes"] * 60 * 25)
     wanted = vc.get("blocks") or []
     written = []
-    for half, first, last in game_blocks:
+    for half, first, last in games.half_video_blocks("BAR-ATH"):
         for k, start in enumerate(range(first, last + 1, size)):
             sel = frames[(frames.frame >= start) & (frames.frame < min(start + size, last + 1))]
             c0 = sel.clock.iloc[0] or "pre"
@@ -260,8 +290,8 @@ def render_blocks(cfg, labels, tracking):
             name = "{}T_{:02d}_{}-{}".format(half, k + 1, c0.replace(":", "m"), c1.replace(":", "m"))
             if wanted and not any(name.startswith(w) for w in wanted):
                 continue
-            path = os.path.join(out_dir, name + ".mp4")
+            path = os.path.join(out_dir, name + ("_GT" if len(shown) > 1 else "") + ".mp4")
             make_video(sel, players, cfg, path, mode=vc["mode"], scale=vc["scale"],
-                       minimap=vc["minimap"], label_col="label", progress_every=0)
+                       minimap=vc["minimap"], label_col=shown, progress_every=0)
             written.append(path)
     return written

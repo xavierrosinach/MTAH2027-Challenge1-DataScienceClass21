@@ -118,9 +118,11 @@ output:
   diagnostics: false                   # imprimir los diagnósticos sin ground truth (src/possession/diagnostics.py)
 
 video:                                 # vídeos de revisión: tracking + nuestra etiqueta (letra grande arriba a la derecha)
-  enabled: false                       # generar vídeos al ejecutar run.py
-  blocks: [1T_01]                      # qué bloques (prefijo del nombre): [1T_01], [1T], [2T_03, 2T_04]; [] = todos
+  enabled: true                        # generar vídeos al ejecutar run.py
+  blocks: [2T]                         # qué bloques (prefijo del nombre): [1T_01], [1T], [2T_03, 2T_04]; [] = todos
   block_minutes: 5                     # duración de cada bloque (min)
   mode: overlay                        # overlay = vídeo real + tracking; pitch = solo campo 2D (más rápido)
   scale: 0.5                           # tamaño respecto a 1920x1080 (0,5 = 960x540)
   minimap: true                        # minimapa del campo abajo a la derecha
+  public_gt: false                     # mostrar también la etiqueta del ground truth público (solo existe en 1T_01;
+                                       #   para entender la definición, nunca para ajustar parámetros)
