@@ -50,20 +50,27 @@ def game_data(job):
     f = context.frame_features(tr, ball, B.no_tags(), cfg)
     live = np.isin(gt, ["H", "A"])
     return {"game": game, "seed": seed, "names": names, "X": (g_h - g_a)[live],
+            "S": (g_h + g_a)[live].astype(np.float32),
             "y": (gt[live] == "H").astype(float), "seen": seen[live],
             "d_h": f["d_h"][live], "d_a": f["d_a"][live]}
 
 
-def fit_models(parts, l2):
+def fit_models(parts, l2, mlp=None):
+    """Conditional logits for frames with and without the ball; with `mlp` (its settings), the
+    model for frames with the ball is the antisymmetric network instead."""
     X = np.concatenate([p["X"] for p in parts])
     y = np.concatenate([p["y"] for p in parts])
     seen = np.concatenate([p["seen"] for p in parts])
-    return {"seen": control.fit(X[seen], y[seen], l2), "gap": control.fit(X[~seen], y[~seen], l2)}
+    gap = control.fit(X[~seen], y[~seen], l2)
+    if mlp is None:
+        return {"seen": control.fit(X[seen], y[seen], l2), "gap": gap}
+    S = np.concatenate([p["S"] for p in parts]).astype(float)
+    return {"seen": control.fit_mlp(X[seen], S[seen], y[seen], **mlp), "gap": gap}
 
 
 def evaluate(models, part, contact_m):
-    X, y, seen = part["X"], part["y"], part["seen"]
-    z = np.where(seen, control.logit(models["seen"], X), control.logit(models["gap"], X))
+    X, y, seen, S = part["X"], part["y"], part["seen"], part["S"].astype(float)
+    z = np.where(seen, control.predict(models["seen"], X, S), control.predict(models["gap"], X, S))
     p = np.clip(1 / (1 + np.exp(-z)), 1e-6, 1 - 1e-6)
     ok = (z > 0) == (y == 1)
     d_h, d_a = part["d_h"], part["d_a"]
@@ -86,6 +93,8 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=list(TRAIN_SEEDS),
                         help="degradation seeds of the training copies")
     parser.add_argument("--no-save", action="store_true", help="only print the held-out scores")
+    parser.add_argument("--mlp", nargs="*", default=None, metavar="KEY=VALUE",
+                        help="override context.control.mlp settings (hidden=32 epochs=12 ...)")
     parser.add_argument("--out", default=None,
                         help="model file (default: context.control.model of the config)")
     args = parser.parse_args()
@@ -108,9 +117,19 @@ def main():
     logo_dir = B.logo_dir(cfg, args.out)
     os.makedirs(logo_dir, exist_ok=True)
     rows = []
+    ctl = cfg["context"]["control"]
+    mlp = None
+    if ctl.get("model_type", "logit") == "mlp":
+        mlp = dict(ctl.get("mlp") or {})
+        for item in args.mlp or []:
+            k, _, v = item.partition("=")
+            mlp[k] = float(v) if "." in v or "e" in v else int(v)
+        print("antisymmetric MLP for frames with the ball: {}".format(mlp))
     info = {"seeds": list(seeds), "l2": args.l2, "degrade": bench["degrade"]}
+    if mlp is not None:
+        info["mlp"] = mlp
     for g in games:
-        models = fit_models([p for p in train if p["game"] != g], args.l2)
+        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp)
         if not args.no_save:
             control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
                          dict(info, games=[x for x in games if x != g]))
@@ -122,9 +141,12 @@ def main():
 
     if args.no_save:
         return
-    models = fit_models(train, args.l2)
+    models = fit_models(train, args.l2, mlp)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     control.save(args.out, names, models, dict(info, games=games))
+    if mlp is not None:
+        print("\nfull model -> {}".format(args.out))
+        return
     w = pd.Series(models["seen"][1], index=names)
     print("\nfull model -> {}; largest |w| (seen): {}".format(
         args.out, ", ".join("{} {:+.2f}".format(k, v)

@@ -734,9 +734,10 @@ def label(tracking, ball, tags, cfg, blocks, frame_period=None, verbose=True):
         # learnt "who controls the ball" (src/possession/control.py), trained on other games
         from . import control
         from .config import REPO_ROOT
-        path = ctl["model"] if os.path.isabs(ctl["model"]) else os.path.join(REPO_ROOT,
-                                                                              ctl["model"])
-        llr, seen = control.control_llr(tracking, ball, blocks, path, control.feature_groups(cfg))
+        paths = [m if os.path.isabs(m) else os.path.join(REPO_ROOT, m)
+                 for m in [ctl["model"]] + list(ctl.get("ensemble") or [])]
+        path = paths[0]
+        llr, seen = control.control_llr(tracking, ball, blocks, paths, control.feature_groups(cfg))
         llr = np.clip(llr, -ctl["clip"], ctl["clip"])
         add_team_llr(e, np.where(seen, ctl["weight"], ctl["gap_weight"]) * llr)
         if verbose:

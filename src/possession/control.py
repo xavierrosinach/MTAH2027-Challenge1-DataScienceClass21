@@ -279,9 +279,85 @@ def logit(model, X):
     return (X / sd) @ w
 
 
+
+# --- non-linear control model: antisymmetric one-hidden-layer network -----------------------
+#
+# z(H vs A) = h([D, S]) - h([-D, S]),  D = G_H - G_A, S = G_H + G_A,  h = w2 . tanh(W1 x + b1)
+# Swapping the teams maps D -> -D and leaves S, so z -> -z: no home bias, as in the logit.
+# (D, S) together carry both teams' features, so h can model interactions (e.g. nearest
+# distance only matters while the ball is slow) that a linear score cannot.
+
+
+def _mlp_forward(p, Xd, Xs):
+    zp = np.tanh(np.hstack([Xd, Xs]) @ p["W1"] + p["b1"])
+    zn = np.tanh(np.hstack([-Xd, Xs]) @ p["W1"] + p["b1"])
+    return zp @ p["w2"] - zn @ p["w2"], zp, zn
+
+
+def fit_mlp(D, S, y, hidden=32, l2=1e-4, epochs=12, batch=2048, lr=2e-3, seed=0):
+    """Antisymmetric MLP, Adam on minibatches, fixed seed. Returns a model dict."""
+    rng = np.random.default_rng(seed)
+    sd_d, sd_s = D.std(axis=0) + 1e-9, S.std(axis=0) + 1e-9
+    mu_s = S.mean(axis=0)
+    Xd, Xs = D / sd_d, (S - mu_s) / sd_s
+    k = Xd.shape[1] + Xs.shape[1]
+    p = {"W1": rng.normal(0, 1 / np.sqrt(k), (k, hidden)), "b1": np.zeros(hidden),
+         "w2": rng.normal(0, 1 / np.sqrt(hidden), hidden)}
+    m = {key: np.zeros_like(v) for key, v in p.items()}
+    v2 = {key: np.zeros_like(v) for key, v in p.items()}
+    step = 0
+    n = len(y)
+    for _ in range(epochs):
+        order = rng.permutation(n)
+        for start in range(0, n, batch):
+            b = order[start:start + batch]
+            xd, xs, yb = Xd[b], Xs[b], y[b]
+            z, ap, an = _mlp_forward(p, xd, xs)
+            g = (1 / (1 + np.exp(-z)) - yb) / len(b)               # dLoss/dz
+            up, un = np.hstack([xd, xs]), np.hstack([-xd, xs])
+            dp = g[:, None] * p["w2"] * (1 - ap ** 2)
+            dn = g[:, None] * p["w2"] * (1 - an ** 2)
+            grads = {"w2": ap.T @ g - an.T @ g + l2 * p["w2"],
+                     "W1": up.T @ dp - un.T @ dn + l2 * p["W1"],
+                     "b1": dp.sum(axis=0) - dn.sum(axis=0)}
+            step += 1
+            for key in p:
+                m[key] = 0.9 * m[key] + 0.1 * grads[key]
+                v2[key] = 0.999 * v2[key] + 0.001 * grads[key] ** 2
+                mh = m[key] / (1 - 0.9 ** step)
+                vh = v2[key] / (1 - 0.999 ** step)
+                p[key] = p[key] - lr * mh / (np.sqrt(vh) + 1e-8)
+    return {"type": "mlp", "sd_d": sd_d, "sd_s": sd_s, "mu_s": mu_s, **p}
+
+
+def mlp_logit(model, D, S):
+    z, _, _ = _mlp_forward(model, D / model["sd_d"], (S - model["mu_s"]) / model["sd_s"])
+    return z
+
+
+def predict(model, D, S):
+    """H-vs-A log-odds of either kind of model: D = G_H - G_A, S = G_H + G_A."""
+    if isinstance(model, dict):
+        return mlp_logit(model, D, S)
+    return logit(model, D)
+
+
+def _to_json(model):
+    if isinstance(model, dict):
+        return {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in model.items()}
+    sd, w = model
+    return {"scale": sd.tolist(), "w": w.tolist()}
+
+
+def _from_json(v):
+    if v.get("type") == "mlp":
+        return {k: (np.array(x) if isinstance(x, list) else x) for k, x in v.items()}
+    return np.array(v["scale"]), np.array(v["w"])
+
+
 def save(path, names, models, info):
     out = {"features": names, "info": info,
-           "models": {k: {"scale": sd.tolist(), "w": w.tolist()} for k, (sd, w) in models.items()}}
+           "models": {k: _to_json(m) for k, m in models.items()}}
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(out, handle, indent=1)
 
@@ -289,16 +365,20 @@ def save(path, names, models, info):
 def load(path):
     with open(path, encoding="utf-8") as handle:
         m = json.load(handle)
-    models = {k: (np.array(v["scale"]), np.array(v["w"])) for k, v in m["models"].items()}
-    return m["features"], models
+    return m["features"], {k: _from_json(v) for k, v in m["models"].items()}
 
 
 def control_llr(tracking, ball, blocks, path, groups=("base",)):
-    """(N,) H-vs-A log-odds from the learnt model, and the ball-seen mask."""
+    """(N,) H-vs-A log-odds from the learnt model, and the ball-seen mask.
+
+    `path` may be a list of model files (same features): their log-odds are averaged."""
     names, g_h, g_a, seen = team_features(tracking, ball, blocks, groups)
-    want, models = load(path)
-    if list(want) != list(names):
-        raise ValueError("control model {} was trained on other features".format(path))
-    X = g_h - g_a
-    llr = np.where(seen, logit(models["seen"], X), logit(models["gap"], X))
-    return llr, seen
+    D, S = g_h - g_a, g_h + g_a
+    paths = [path] if isinstance(path, str) else list(path)
+    llr = np.zeros(len(D))
+    for p in paths:
+        want, models = load(p)
+        if list(want) != list(names):
+            raise ValueError("control model {} was trained on other features".format(p))
+        llr += np.where(seen, predict(models["seen"], D, S), predict(models["gap"], D, S))
+    return llr / len(paths), seen

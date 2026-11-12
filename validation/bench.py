@@ -132,9 +132,12 @@ def load_config_for_game(path, game):
     cfg = load_config(path)
     ctl = cfg["context"].get("control") or {}
     if ctl.get("enabled"):
-        ctl["model"] = os.path.join(logo_dir(cfg, ctl["model"]), "logo_{}.json".format(game))
-        if not os.path.isfile(ctl["model"]):
-            raise FileNotFoundError("run validation/train_control.py first: " + ctl["model"])
+        logo = [os.path.join(logo_dir(cfg, m), "logo_{}.json".format(game))
+                for m in [ctl["model"]] + list(ctl.get("ensemble") or [])]
+        for m in logo:
+            if not os.path.isfile(m):
+                raise FileNotFoundError("run validation/train_control.py first: " + m)
+        ctl["model"], ctl["ensemble"] = logo[0], logo[1:]
     return cfg
 
 

@@ -59,7 +59,8 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 | 1 | main 6791db5 (Xavier, Viterbi) | 0.507 | 0.404 | 0.435 | 0.473 | 0.455 | 0.812 | ~215 | reference |
 | 2 | #1 + `team_switch` 20 -> 16 | 0.520 | 0.415 | 0.443 | 0.476 | 0.463 | 0.812 | ~237 | kept |
 | 3 | #2 + learnt control model (`context.control`, weight 1) | 0.609 | 0.540 | 0.565 | 0.617 | 0.583 | 0.847 | ~244 | kept |
-| 4 | #3 + movement features (`features: [base, motion]`) | 0.615 | 0.555 | 0.579 | 0.629 | **0.594** | **0.849** | ~250 | **kept** |
+| 4 | #3 + movement features (`features: [base, motion]`) | 0.615 | 0.555 | 0.579 | 0.629 | 0.594 | 0.849 | ~250 | kept |
+| 5 | #4 averaged with a non-linear model (`model_type: mlp`, `ensemble`) | 0.627 | 0.564 | 0.591 | 0.638 | **0.605** | **0.851** | ~251 | **kept** |
 
 Entry 2: +0.009 spellF1, better under all 4 conditions (worst +0.003), 10/12 cells, games 1 and 3 up,
 game 2 flat (-0.003). The reference under-segments (215 predicted vs 384 true possessions); a
@@ -118,6 +119,29 @@ Tried in the same run and not kept (paired mean vs #3, cells better):
 frames in control before / after, time since / until the team's last / next control): -0.003,
 3/12; all three groups together: +0.009, 11/12 but below `motion` alone and +0.001 under `light`.
 The linear model gains little from more of the same evidence; what it lacked was how players move.
+
+Entry 5 (branch `exp/nolineal`): **+0.0104 spellF1 (paired over 48 runs: standard error 0.0013,
+90 % of runs better), +0.0023 macroF1, better in all 12 (condition, game) cells for both metrics.**
+The log-odds of the linear model #4 are averaged with those of an antisymmetric one-hidden-layer
+network on the same features (`control.fit_mlp`): z = h([D, S]) - h([-D, S]), D = G_H - G_A,
+S = G_H + G_A, h = w2 . tanh(W1 x + b1). Swapping the teams flips z, so no home bias, and it can
+use interactions a linear score cannot (nearest distance matters only while the ball is slow...).
+Plain numpy, Adam, fixed seed; retraining gives the same weights. Size chosen on held-out-game
+log-loss in `train_control.py`, not on the bench: 32 hidden / 12 epochs overfit (log-loss 0.22-0.28
+vs 0.17-0.19 linear); 16 / 4 / l2 1e-3 gives 0.155-0.178 and 92.9-93.9 % accuracy (linear 92.6-93.1 %);
+16 / 6 and 32 / 4 the same, so the smaller.
+
+- *The network alone was not kept* although it passed the rule (+0.0139, se 0.0023, all 4
+  conditions, 9/12 cells): it lost on game 3 under 3 of 4 conditions (-0.006). Its gain came from
+  games 1 and 2; game 3, the most different of the three, is the best stand-in for an unseen match.
+  On BAR-ATH (`check_control.py`) it was also less like the bench than the linear model: confident
+  (|llr| > 2) on 77 % vs 82 % of frames with ball, 7.6 vs 7.0 sign flips per minute (linear: 79 vs
+  80 %, 6.4 vs 7.0).
+- *The average* keeps most of the gain and loses nowhere (game 3: +0.002 to +0.008); on BAR-ATH it
+  sits between the two (79 vs 81 %, 7.0 vs 6.8 flips per minute).
+- Files: `models/control_mlp.json` (the network, trained with `config.yaml`) and
+  `models/control_v2.json` (the linear #4, trained with `features: [base, motion]` and the default
+  `model_type`).
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 

@@ -34,11 +34,14 @@ def features(tr, blocks, cfg):
     graded = np.zeros(len(ball), bool)
     for _, a, b in blocks:
         graded[a:b + 1] = True
-    return names, (g_h - g_a)[graded], seen[graded]
+    return names, (g_h - g_a)[graded], seen[graded], (g_h + g_a)[graded]
 
 
-def summary(X, seen, models):
-    z = np.where(seen, control.logit(models["seen"], X), control.logit(models["gap"], X))
+def summary(X, seen, models, S):
+    """models: one model set, or a list of them whose log-odds are averaged (an ensemble)."""
+    sets = models if isinstance(models, list) else [models]
+    z = np.mean([np.where(seen, control.predict(m["seen"], X, S), control.predict(m["gap"], X, S))
+                 for m in sets], axis=0)
     zs = z[seen]
     flips = np.sum(np.sign(zs[1:]) != np.sign(zs[:-1]))
     out = {"ball seen": seen.mean(), "|llr|>2 seen": np.mean(np.abs(zs) > 2),
@@ -59,21 +62,24 @@ def main():
         args.model = os.path.join(B.REPO, cfg["context"]["control"]["model"])
     bench = B.load_bench(args.bench)
     names, models = control.load(args.model)
-    sd = models["seen"][0]
+    extra = [control.load(os.path.join(B.REPO, m))[1]
+             for m in (cfg["context"]["control"].get("ensemble") or [])]
+    sd = models["gap"][0] if isinstance(models["seen"], dict) else models["seen"][0]
 
     import games
     from possession.data import load_tracking
-    _, Xb, sb = features(load_tracking(cfg), games.half_video_blocks("BAR-ATH"), cfg)
-    Xm, sm = [], []
+    _, Xb, sb, Sb = features(load_tracking(cfg), games.half_video_blocks("BAR-ATH"), cfg)
+    Xm, sm, Sm = [], [], []
     for g in bench["games"]:
         tr = metrica.load_tracking(bench["metrica_dir"], g, cache_dir=cfg["paths"]["cache_dir"])
         gt, blocks = gt_events.ground_truth(metrica.load_events(bench["metrica_dir"], g),
                                             tr["n_frames"])
         tr = deg.degrade(tr, gt, bench["degrade"], 0)
-        _, X, s = features(tr, blocks, cfg)
+        _, X, s, S = features(tr, blocks, cfg)
         Xm.append(X)
         sm.append(s)
-    Xm, sm = np.concatenate(Xm), np.concatenate(sm)
+        Sm.append(S)
+    Xm, sm, Sm = np.concatenate(Xm), np.concatenate(sm), np.concatenate(Sm)
 
     rows = []
     for j, name in enumerate(names):
@@ -90,8 +96,8 @@ def main():
         print("features (H - A) / training scale, frames with ball (shape: all graded frames):")
         print(df.to_string())
         print("\nmodel output:")
-        print(pd.DataFrame({"BAR-ATH": summary(Xb, sb, models),
-                            "Metrica degraded": summary(Xm, sm, models)}).to_string())
+        print(pd.DataFrame({"BAR-ATH": summary(Xb, sb, [models] + extra, Sb),
+                            "Metrica degraded": summary(Xm, sm, [models] + extra, Sm)}).to_string())
 
 
 if __name__ == "__main__":
