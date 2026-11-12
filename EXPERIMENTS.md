@@ -57,6 +57,36 @@ a change must not make these implausible). Game 3, the most different bench game
 its own. Exploratory runs on BAR-ATH go through `check_bar.py`, never `run.py` with the public
 table on.
 
+## Branches: every path explored
+
+`josep/mejoras` is the best version so far. Each experiment has its own branch:
+
+- An **accepted** branch points at the commit that was merged.
+- A **rejected** branch has one commit on top of the commit where it was tested. That commit
+  switches `config.yaml` to the variant and adds its models, so `git checkout exp/<x>` followed by
+  `python run.py` reproduces it. The commit message gives the bench result.
+
+| branch | entry | change | decision |
+|---|---|---|---|
+| `exp/team-switch-16` | 2 | `team_switch` 20 -> 16 | accepted |
+| `exp/control-aprendido` | 3 | learnt control model (linear) | accepted |
+| `exp/rasgos` | 4 | movement features | accepted |
+| `exp/nolineal` | 5 | average with the antisymmetric network | accepted |
+| `exp/peso-posesion` | 6 | possession-length weighting 0.25 | accepted (current) |
+| `exp/contacto-1m` | rejected table | `contact_m` 1.0 | rejected |
+| `exp/gap-weight` | 3 | control model in ball gaps too (0.3) | rejected (noise) |
+| `exp/cercania-ademas` | 3 | keep nearest-player evidence as well | rejected |
+| `exp/rasgos-long` / `-touch` / `-todos` | 4 | other feature groups | rejected |
+| `exp/red-sola` | 5 | the network alone | rejected (game 3) |
+| `exp/peso-0.5` / `exp/peso-1` | 6 | stronger weighting | rejected (coarseGT) |
+| `exp/rasgos-short` | 6 | half-second features on v4 | rejected |
+| `exp/team-switch-13` / `-20` | 6 | hand-over cost on v4 | rejected (coarseGT / worse) |
+| `exp/muerto` | 7 | learnt dead-ball model, on | rejected (does not transfer) |
+
+Not on a branch: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
+These were first-bench trials whose code or settings were not kept; the table below gives their
+results.
+
 ## Results (current bench: commit b259b60)
 
 Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted possessions (GT 384).
