@@ -366,13 +366,19 @@ def mlp_logit(model, D, S):
 
 
 def predict(model, D, S):
-    """H-vs-A log-odds of either kind of model: D = G_H - G_A, S = G_H + G_A."""
+    """H-vs-A log-odds of either kind of model: D = G_H - G_A, S = G_H + G_A.
+    A list of models (networks trained with different seeds, context.control.mlp_seeds) gives
+    the mean of their log-odds."""
+    if isinstance(model, list):
+        return np.mean([predict(m, D, S) for m in model], axis=0)
     if isinstance(model, dict):
         return mlp_logit(model, D, S)
     return logit(model, D)
 
 
 def _to_json(model):
+    if isinstance(model, list):
+        return [_to_json(m) for m in model]
     if isinstance(model, dict):
         return {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in model.items()}
     sd, w = model
@@ -380,6 +386,8 @@ def _to_json(model):
 
 
 def _from_json(v):
+    if isinstance(v, list):
+        return [_from_json(x) for x in v]
     if v.get("type") == "mlp":
         return {k: (np.array(x) if isinstance(x, list) else x) for k, x in v.items()}
     return np.array(v["scale"]), np.array(v["w"])
@@ -401,7 +409,9 @@ def load(path):
 def control_llr(tracking, ball, blocks, path, groups=("base",)):
     """(N,) H-vs-A log-odds from the learnt model, and the ball-seen mask.
 
-    `path` may be a list of model files (same features): their log-odds are averaged."""
+    `path` may be a list of model files (same features): their log-odds are averaged. A file
+    may hold several networks (context.control.mlp_seeds): predict() averages them first, so
+    they count as one member of that average."""
     names, g_h, g_a, seen = team_features(tracking, ball, blocks, groups)
     D, S = g_h - g_a, g_h + g_a
     paths = [path] if isinstance(path, str) else list(path)

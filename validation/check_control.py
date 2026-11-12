@@ -64,7 +64,9 @@ def main():
     names, models = control.load(args.model)
     extra = [control.load(os.path.join(B.REPO, m))[1]
              for m in (cfg["context"]["control"].get("ensemble") or [])]
-    sd = models["gap"][0] if isinstance(models["seen"], dict) else models["seen"][0]
+    # training scale of each feature: from the gap logit when "seen" is a network (or a list of
+    # networks, context.control.mlp_seeds)
+    sd = models["gap"][0] if isinstance(models["seen"], (dict, list)) else models["seen"][0]
 
     import games
     from possession.data import load_tracking

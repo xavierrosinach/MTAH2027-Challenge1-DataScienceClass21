@@ -60,11 +60,12 @@ def game_data(job):
             "d_h": f["d_h"][live], "d_a": f["d_a"][live]}
 
 
-def fit_models(parts, l2, mlp=None, power=0.0):
+def fit_models(parts, l2, mlp=None, power=0.0, mlp_seeds=None):
     """Conditional logits for frames with and without the ball; with `mlp` (its settings), the
     model for frames with the ball is the antisymmetric network instead. power > 0 weights each
     frame by (length of its true possession)^-power (1: every possession weighs the same, as in
-    spellF1); weights are normalised to mean 1."""
+    spellF1); weights are normalised to mean 1. With mlp_seeds (2 or more), one network per seed,
+    stored as a list: control.predict averages their log-odds."""
     X = np.concatenate([p["X"] for p in parts])
     y = np.concatenate([p["y"] for p in parts])
     seen = np.concatenate([p["seen"] for p in parts])
@@ -76,6 +77,10 @@ def fit_models(parts, l2, mlp=None, power=0.0):
     if mlp is None:
         return {"seen": control.fit(X[seen], y[seen], l2, sw=sw_seen), "gap": gap}
     S = np.concatenate([p["S"] for p in parts]).astype(float)
+    if mlp_seeds:
+        Xs, Ss, ys = X[seen], S[seen], y[seen]
+        nets = [control.fit_mlp(Xs, Ss, ys, sw=sw_seen, **dict(mlp, seed=s)) for s in mlp_seeds]
+        return {"seen": nets, "gap": gap}
     return {"seen": control.fit_mlp(X[seen], S[seen], y[seen], sw=sw_seen, **mlp), "gap": gap}
 
 
@@ -95,30 +100,40 @@ def evaluate(models, part, contact_m):
             "rule_acc_seen": rule_ok[seen].mean(), "model_acc_contact": ok[contact].mean()}
 
 
-def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, args):
-    """Leave-one-game-out copies (held-out scores printed), then the full model -> out."""
+def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, args,
+              mlp_seeds=None):
+    """Leave-one-game-out copies (held-out scores printed), then the full model -> out.
+    With mlp_seeds, the held-out scores of each network (rows '<game> s<seed>') come before
+    those of their average (row '<game>')."""
     info = {"seeds": list(seeds), "l2": args.l2, "degrade": bench["degrade"]}
     if power:
         info["weight_power"] = power
     if mlp is not None:
         info["mlp"] = mlp
+    if mlp_seeds:
+        info["mlp_seeds"] = list(mlp_seeds)
     logo_dir = B.logo_dir(cfg, out)
     os.makedirs(logo_dir, exist_ok=True)
     rows = []
+    contact_m = cfg["context"]["ball"]["contact_m"]
     for g in games:
-        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp, power)
+        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp, power, mlp_seeds)
         if not args.no_save:
             control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
                          dict(info, games=[x for x in games if x != g]))
         held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED][0]
-        rows.append(evaluate(models, held, cfg["context"]["ball"]["contact_m"]))
+        if mlp_seeds:
+            for s, net in zip(mlp_seeds, models["seen"]):
+                row = evaluate(dict(models, seen=net), held, contact_m)
+                rows.append(dict(row, game="{} s{}".format(g, s)))
+        rows.append(evaluate(models, held, contact_m))
     with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
         print("\n{} ({}): held-out game (trained on the other two), live frames:".format(
             os.path.basename(out), "mlp" if mlp is not None else "logit"))
         print(pd.DataFrame(rows).set_index("game").to_string())
     if args.no_save:
         return None
-    models = fit_models(train, args.l2, mlp, power)
+    models = fit_models(train, args.l2, mlp, power, mlp_seeds)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     control.save(out, names, models, dict(info, games=games))
     print("full model -> {}".format(out))
@@ -163,14 +178,23 @@ def main():
             k, _, v = item.partition("=")
             mlp[k] = float(v) if "." in v or "e" in v else int(v)
         print("antisymmetric MLP for frames with the ball: {}".format(mlp))
+    # context.control.mlp_seeds: absent or one seed -> one network (that seed), as before;
+    # two or more -> one network per seed, their log-odds averaged (EXPERIMENTS.md, exp/semillas)
+    mlp_seeds = list(ctl.get("mlp_seeds") or [])
+    if mlp is not None and len(mlp_seeds) == 1:
+        mlp["seed"] = mlp_seeds[0]
+    mlp_seeds = mlp_seeds if mlp is not None and len(mlp_seeds) > 1 else None
+    if mlp_seeds:
+        print("{} networks, seeds {}: log-odds averaged".format(len(mlp_seeds), mlp_seeds))
     power = float(ctl.get("weight_power") or 0.0)
     if power:
         print("frames weighted by (true possession length)^-{}".format(power))
     # the model, then each ensemble member (conditional logits, same features and weights)
-    targets = [(args.out, mlp)] + [(os.path.join(B.REPO, m), None)
-                                   for m in (ctl.get("ensemble") or [])]
-    for out, kind in targets:
-        models = train_one(out, kind, power, train, parts, games, seeds, bench, cfg, names, args)
+    targets = [(args.out, mlp, mlp_seeds)] + [(os.path.join(B.REPO, m), None, None)
+                                              for m in (ctl.get("ensemble") or [])]
+    for out, kind, kind_seeds in targets:
+        models = train_one(out, kind, power, train, parts, games, seeds, bench, cfg, names, args,
+                           kind_seeds)
     if args.no_save or mlp is not None or len(targets) > 1:
         return
     w = pd.Series(models["seen"][1], index=names)
