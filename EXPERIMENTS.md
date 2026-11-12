@@ -60,7 +60,8 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 | 2 | #1 + `team_switch` 20 -> 16 | 0.520 | 0.415 | 0.443 | 0.476 | 0.463 | 0.812 | ~237 | kept |
 | 3 | #2 + learnt control model (`context.control`, weight 1) | 0.609 | 0.540 | 0.565 | 0.617 | 0.583 | 0.847 | ~244 | kept |
 | 4 | #3 + movement features (`features: [base, motion]`) | 0.615 | 0.555 | 0.579 | 0.629 | 0.594 | 0.849 | ~250 | kept |
-| 5 | #4 averaged with a non-linear model (`model_type: mlp`, `ensemble`) | 0.627 | 0.564 | 0.591 | 0.638 | **0.605** | **0.851** | ~251 | **kept** |
+| 5 | #4 averaged with a non-linear model (`model_type: mlp`, `ensemble`) | 0.627 | 0.564 | 0.591 | 0.638 | 0.605 | 0.851 | ~251 | kept |
+| 6 | #5 trained with frames weighted by possession length^-0.25 (`weight_power`) | 0.640 | 0.573 | 0.599 | 0.640 | **0.613** | **0.852** | ~260 | **kept** |
 
 Entry 2: +0.009 spellF1, better under all 4 conditions (worst +0.003), 10/12 cells, games 1 and 3 up,
 game 2 flat (-0.003). The reference under-segments (215 predicted vs 384 true possessions); a
@@ -139,9 +140,34 @@ vs 0.17-0.19 linear); 16 / 4 / l2 1e-3 gives 0.155-0.178 and 92.9-93.9 % accurac
   80 %, 6.4 vs 7.0).
 - *The average* keeps most of the gain and loses nowhere (game 3: +0.002 to +0.008); on BAR-ATH it
   sits between the two (79 vs 81 %, 7.0 vs 6.8 flips per minute).
-- Files: `models/control_mlp.json` (the network, trained with `config.yaml`) and
-  `models/control_v2.json` (the linear #4, trained with `features: [base, motion]` and the default
-  `model_type`).
+- Files (replaced by #6's): `models/control_mlp.json` (the network) and `models/control_v2.json`
+  (the linear #4).
+
+Entry 6 (branch `exp/peso-posesion`): **+0.0081 spellF1 (paired, standard error 0.0015, 79 % of
+runs better), macroF1 +0.0005, better under all 4 conditions (coarseGT +0.002), 11/12 cells**
+(the one below: game 3 `degraded`, -0.002). Both models of the average are trained with each frame
+weighted by (length of its true possession)^-p, normalised to mean 1: spellF1 counts every
+possession once, per-frame training counts long ones many times. The error analysis of #5 showed
+the evidence missing short possessions. One command trains both (`train_control.py` now trains
+the `ensemble` members too): `models/control_v4_mlp.json`, `models/control_v4_lin.json`.
+On BAR-ATH the output is as like the bench as #5's (confident on 76 vs 79 % of frames with ball,
+7.7 vs 7.6 sign flips per minute).
+
+| p | mean spell | light | degraded | +tags | +coarseGT | cells | macro | poss | |
+|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|
+| 0 (#5) | 0.605 | 0.627 | 0.564 | 0.591 | 0.638 | | 0.851 | 248 | |
+| 0.25 | 0.613 | 0.640 | 0.573 | 0.599 | 0.640 | 11/12 | 0.852 | 256 | kept |
+| 0.5 | 0.617 | 0.645 | 0.581 | 0.604 | **0.636** | 10/12 | 0.851 | 266 | loses under coarseGT |
+| 1 | 0.602 | 0.646 | 0.568 | 0.593 | **0.601** | 6/12 | 0.846 | 295 | over-segments |
+
+The stronger the weighting, the more short possessions it finds, which pays with the fine ground
+truth and costs with the coarse one. BAR-ATH's public window has fewer short possessions than the
+bench's fine ground truth (2 of 17 under 2 s vs 27 %), so only the value that wins under both is
+kept.
+
+Also tried (same run as 0.25): group `short` (the proximity features over +/- 0.5 s and the half
+second before / after) on #5: +0.0029 (se 0.0009), all 4 conditions but 9/12 cells. Small; to
+retry on top of #6.
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 

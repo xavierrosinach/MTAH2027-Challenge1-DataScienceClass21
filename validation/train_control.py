@@ -49,23 +49,34 @@ def game_data(job):
     names, g_h, g_a, seen = control.team_features(tr, ball, blocks, control.feature_groups(cfg))
     f = context.frame_features(tr, ball, B.no_tags(), cfg)
     live = np.isin(gt, ["H", "A"])
-    return {"game": game, "seed": seed, "names": names, "X": (g_h - g_a)[live],
+    # length (s) of the true possession each frame belongs to (for weight_power)
+    change = np.flatnonzero(gt[1:] != gt[:-1]) + 1
+    starts = np.concatenate(([0], change))
+    lengths = np.diff(np.concatenate((starts, [len(gt)])))
+    spell_s = np.repeat(lengths, lengths) / 25.0
+    return {"spell_s": spell_s[live],"game": game, "seed": seed, "names": names, "X": (g_h - g_a)[live],
             "S": (g_h + g_a)[live].astype(np.float32),
             "y": (gt[live] == "H").astype(float), "seen": seen[live],
             "d_h": f["d_h"][live], "d_a": f["d_a"][live]}
 
 
-def fit_models(parts, l2, mlp=None):
+def fit_models(parts, l2, mlp=None, power=0.0):
     """Conditional logits for frames with and without the ball; with `mlp` (its settings), the
-    model for frames with the ball is the antisymmetric network instead."""
+    model for frames with the ball is the antisymmetric network instead. power > 0 weights each
+    frame by (length of its true possession)^-power (1: every possession weighs the same, as in
+    spellF1); weights are normalised to mean 1."""
     X = np.concatenate([p["X"] for p in parts])
     y = np.concatenate([p["y"] for p in parts])
     seen = np.concatenate([p["seen"] for p in parts])
-    gap = control.fit(X[~seen], y[~seen], l2)
+    sw_seen = sw_gap = None
+    if power:
+        w = np.concatenate([p["spell_s"] for p in parts]) ** -power
+        sw_seen, sw_gap = w[seen] / w[seen].mean(), w[~seen] / w[~seen].mean()
+    gap = control.fit(X[~seen], y[~seen], l2, sw=sw_gap)
     if mlp is None:
-        return {"seen": control.fit(X[seen], y[seen], l2), "gap": gap}
+        return {"seen": control.fit(X[seen], y[seen], l2, sw=sw_seen), "gap": gap}
     S = np.concatenate([p["S"] for p in parts]).astype(float)
-    return {"seen": control.fit_mlp(X[seen], S[seen], y[seen], **mlp), "gap": gap}
+    return {"seen": control.fit_mlp(X[seen], S[seen], y[seen], sw=sw_seen, **mlp), "gap": gap}
 
 
 def evaluate(models, part, contact_m):
@@ -82,6 +93,36 @@ def evaluate(models, part, contact_m):
             "acc_conf": ok[seen & (np.abs(z) > 2)].mean(),
             "rule_cover": contact[seen].mean(), "rule_acc_contact": rule_ok[contact].mean(),
             "rule_acc_seen": rule_ok[seen].mean(), "model_acc_contact": ok[contact].mean()}
+
+
+def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, args):
+    """Leave-one-game-out copies (held-out scores printed), then the full model -> out."""
+    info = {"seeds": list(seeds), "l2": args.l2, "degrade": bench["degrade"]}
+    if power:
+        info["weight_power"] = power
+    if mlp is not None:
+        info["mlp"] = mlp
+    logo_dir = B.logo_dir(cfg, out)
+    os.makedirs(logo_dir, exist_ok=True)
+    rows = []
+    for g in games:
+        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp, power)
+        if not args.no_save:
+            control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
+                         dict(info, games=[x for x in games if x != g]))
+        held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED][0]
+        rows.append(evaluate(models, held, cfg["context"]["ball"]["contact_m"]))
+    with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
+        print("\n{} ({}): held-out game (trained on the other two), live frames:".format(
+            os.path.basename(out), "mlp" if mlp is not None else "logit"))
+        print(pd.DataFrame(rows).set_index("game").to_string())
+    if args.no_save:
+        return None
+    models = fit_models(train, args.l2, mlp, power)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    control.save(out, names, models, dict(info, games=games))
+    print("full model -> {}".format(out))
+    return models
 
 
 def main():
@@ -114,9 +155,6 @@ def main():
     print("features: {} per team, {} live frames per game x seed  ({:.0f} s)".format(
         len(names), int(np.mean([len(p["y"]) for p in parts])), time.time() - t0))
 
-    logo_dir = B.logo_dir(cfg, args.out)
-    os.makedirs(logo_dir, exist_ok=True)
-    rows = []
     ctl = cfg["context"]["control"]
     mlp = None
     if ctl.get("model_type", "logit") == "mlp":
@@ -125,27 +163,15 @@ def main():
             k, _, v = item.partition("=")
             mlp[k] = float(v) if "." in v or "e" in v else int(v)
         print("antisymmetric MLP for frames with the ball: {}".format(mlp))
-    info = {"seeds": list(seeds), "l2": args.l2, "degrade": bench["degrade"]}
-    if mlp is not None:
-        info["mlp"] = mlp
-    for g in games:
-        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp)
-        if not args.no_save:
-            control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
-                         dict(info, games=[x for x in games if x != g]))
-        held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED][0]
-        rows.append(evaluate(models, held, cfg["context"]["ball"]["contact_m"]))
-    with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
-        print("\nheld-out game (trained on the other two), live frames:")
-        print(pd.DataFrame(rows).set_index("game").to_string())
-
-    if args.no_save:
-        return
-    models = fit_models(train, args.l2, mlp)
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    control.save(args.out, names, models, dict(info, games=games))
-    if mlp is not None:
-        print("\nfull model -> {}".format(args.out))
+    power = float(ctl.get("weight_power") or 0.0)
+    if power:
+        print("frames weighted by (true possession length)^-{}".format(power))
+    # the model, then each ensemble member (conditional logits, same features and weights)
+    targets = [(args.out, mlp)] + [(os.path.join(B.REPO, m), None)
+                                   for m in (ctl.get("ensemble") or [])]
+    for out, kind in targets:
+        models = train_one(out, kind, power, train, parts, games, seeds, bench, cfg, names, args)
+    if args.no_save or mlp is not None or len(targets) > 1:
         return
     w = pd.Series(models["seen"][1], index=names)
     print("\nfull model -> {}; largest |w| (seen): {}".format(

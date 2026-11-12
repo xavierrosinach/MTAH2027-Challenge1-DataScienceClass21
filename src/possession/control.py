@@ -252,21 +252,49 @@ def _touch(tracking, ball, blocks, seen, dist, team, sign_h):
     return _pack(per_team)
 
 
-EXTRA.update({"long": _long, "motion": _motion, "touch": _touch})
+SHORT_WINDOWS = (("c05", -12, 12), ("past05", -12, -1), ("next05", 1, 12))
+
+
+def _short(tracking, ball, blocks, seen, dist, team, sign_h):
+    """The proximity features over narrow windows (+/- 0.5 s, the half second before / after):
+    the +/- 2 s averages that carry most of the base model drown a possession of one second."""
+    per_team = []
+    for t in (0, 1):
+        d, _, d1 = _nearest(dist, team, t)
+        two = np.partition(d, 1, axis=1)[:, :2]
+        d1, d2 = np.minimum(two[:, 0], 40.0), np.minimum(two[:, 1], 40.0)
+        raw = {"near1": np.exp(-d1 / 1.0), "near2p5": np.exp(-d1 / 2.5),
+               "second2p5": np.exp(-d2 / 2.5), "n5": (d < 5).sum(axis=1).astype(float)}
+        cols, names = [], []
+        for name, x in raw.items():
+            c, nm = _windowed(x, seen, SHORT_WINDOWS, name)
+            cols += c
+            names += nm
+        per_team.append((cols, names))
+    return _pack(per_team)
+
+
+EXTRA.update({"long": _long, "motion": _motion, "touch": _touch, "short": _short})
 GROUPS = ("base",) + tuple(EXTRA)
 
 
-def fit(X, y, l2=1.0, iters=60):
+def fit(X, y, l2=1.0, iters=60, sw=None):
     """Conditional logit on X = G_H - G_A: logistic regression without intercept, made symmetric
-    by adding every frame with the teams swapped (-X, 1 - y). Returns (scale, w)."""
+    by adding every frame with the teams swapped (-X, 1 - y). Returns (scale, w).
+    sw: optional per-frame sample weights (mean 1)."""
     sd = X.std(axis=0) + 1e-9
     Z = np.concatenate([X / sd, -X / sd])
     t = np.concatenate([y, 1 - y]).astype(float)
     w = np.zeros(Z.shape[1])
+    sw2 = None if sw is None else np.concatenate([sw, sw])
     for _ in range(iters):
         p = 1 / (1 + np.exp(-Z @ w))
-        g = Z.T @ (p - t) + l2 * w
-        Hs = (Z * (p * (1 - p))[:, None]).T @ Z + l2 * np.eye(len(w))
+        if sw2 is None:
+            g = Z.T @ (p - t) + l2 * w
+            Hs = (Z * (p * (1 - p))[:, None]).T @ Z + l2 * np.eye(len(w))
+        else:
+            g = Z.T @ (sw2 * (p - t)) + l2 * w
+            Hs = (Z * (sw2 * p * (1 - p))[:, None]).T @ Z + l2 * np.eye(len(w))
         step = np.linalg.solve(Hs, g)
         w -= step
         if np.abs(step).max() < 1e-7:
@@ -294,7 +322,7 @@ def _mlp_forward(p, Xd, Xs):
     return zp @ p["w2"] - zn @ p["w2"], zp, zn
 
 
-def fit_mlp(D, S, y, hidden=32, l2=1e-4, epochs=12, batch=2048, lr=2e-3, seed=0):
+def fit_mlp(D, S, y, hidden=32, l2=1e-4, epochs=12, batch=2048, lr=2e-3, seed=0, sw=None):
     """Antisymmetric MLP, Adam on minibatches, fixed seed. Returns a model dict."""
     rng = np.random.default_rng(seed)
     sd_d, sd_s = D.std(axis=0) + 1e-9, S.std(axis=0) + 1e-9
@@ -314,6 +342,8 @@ def fit_mlp(D, S, y, hidden=32, l2=1e-4, epochs=12, batch=2048, lr=2e-3, seed=0)
             xd, xs, yb = Xd[b], Xs[b], y[b]
             z, ap, an = _mlp_forward(p, xd, xs)
             g = (1 / (1 + np.exp(-z)) - yb) / len(b)               # dLoss/dz
+            if sw is not None:
+                g = g * sw[b]
             up, un = np.hstack([xd, xs]), np.hstack([-xd, xs])
             dp = g[:, None] * p["w2"] * (1 - ap ** 2)
             dn = g[:, None] * p["w2"] * (1 - an ** 2)
