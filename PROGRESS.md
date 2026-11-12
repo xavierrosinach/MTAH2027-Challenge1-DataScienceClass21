@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-12
+**Actualizado:** 2026-11-12 19:10
 
 **Calendario:**
 
@@ -33,7 +33,7 @@ oficiales. CSV actual: SHA256 `00bf726c…`, 270 posesiones (media 14,0 s).
 | línea | rama | agente | estado |
 |---|---|---|---|
 | Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | worker Claude (`C:\MTAH2027\wt-idsse`) | desde 12-nov 18:10: descarga, cargador y GT; después, entrenar con 10 partidos y banco |
-| Promedio de 5 redes con semillas distintas | `exp/semillas` | worker Claude (`C:\MTAH2027\wt-semillas`) | desde 12-nov 18:05: implementación y banco |
+| Constantes de reglas revisadas con el modelo aprendido: pases, golpeos y costes de muerto | `exp/reglas` | worker Claude (`C:\MTAH2027\wt-reglas`) | desde 12-nov 19:05: diagnóstico con errors.py y barridos |
 
 ## Experimentos cerrados
 
@@ -48,12 +48,13 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 12-nov | control | `aceptado/control/v3-red-promediada` | promedio con red antisimétrica | 0.605 (+0.010) | aceptada |
 | 12-nov | control | `aceptado/control/v4-peso-posesion` | peso por duración de posesión | 0.613 (+0.008) | **aceptada (actual)** |
 | 11/12-nov | todos | 13 etiquetas `descartado/...` | ver EXPERIMENTS.md | | descartadas |
+| 12-nov | control | `descartado/control/semillas` | promedio de 5 redes con semillas distintas | 0.614 (+0.001, error típico 0.001) | descartada: pierde en light y +tags (ruido) |
 
 ## Cola de ideas (en orden)
 
 1. (en curso) Más partidos: IDSSE. Cumple la política general de Josep del 12-nov: descarga
    pública sin registro (figshare) y licencia CC BY 4.0, comprobadas en la API de figshare.
-2. (en curso) Promedio de varias redes entrenadas con semillas distintas.
+2. (en curso) Constantes de reglas (pases, golpeos, costes de muerto) revisadas sobre v4.
 3. Modelo de secuencias de toques, para las posesiones de menos de 2 s.
 4. Smart Tagging como pista de equipo.
 5. Otros datasets abiertos para más adelante: SkillCorner opendata (licencia MIT, tracking de
@@ -65,6 +66,12 @@ Si un agente rompe el protocolo, se anota aquí con lo que vio y cómo se resolv
 
 - 12-nov: una ejecución exploratoria de `run.py` imprimió la tabla pública (candidato #7). La
   decisión se tomó sin ella (`check_bar`), y desde entonces se usa `run.py --no-public`.
+- 12-nov, bloqueos sin consecuencias (el guardián los paró y no se vio nada):
+  - el worker de `exp/semillas` hizo un `ls` que incluía la carpeta `cache`;
+  - el coordinador leyó `blocked.log` con Bash en vez de Read, y lanzó un comando que llamaba a
+    Python fuera del intérprete permitido (lo pidió solo para ver la versión).
+
+  Errores propios, no falsos positivos.
 
 ## Para Josep (avisos y decisiones pendientes)
 
