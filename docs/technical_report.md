@@ -125,10 +125,14 @@ rule-based version, to **0.613**, with macroF1 0.852.
     pieces that get a predicted stoppage must stay plausible.
 - **Public 5 minutes.** Only a smoke test after a decision is committed (`run.py` prints it).
   Once, an exploratory run printed it for a candidate. That candidate was rejected on the
-  label-free checks (§3, learnt dead-ball model), and exploratory runs on our match have used
-  `check_bar.py` since, which never loads the public ground truth.
-- **Experiment branches.** Each experiment lives on its own branch, `exp/<idea>`, whether
-  accepted or rejected (map in EXPERIMENTS.md). Accepted ones are merged into `josep/mejoras`.
+  label-free checks (§3, learnt dead-ball model). Since then, exploratory runs on our match use
+  `check_bar.py`, and regenerating the file uses `run.py --no-public`. Neither loads the public
+  ground truth.
+- **Experiment record.** Each experiment is developed on its own branch, `exp/<idea>`.
+  - Once decided, it is kept as a tag, `aceptado/<group>/<idea>` or `descartado/<group>/<idea>`.
+  - Each rejected tag reproduces its variant.
+  - Accepted experiments are merged into `josep/mejoras`.
+  - The map is in EXPERIMENTS.md.
 - **Use of an AI assistant.** Part of the code was written with an AI coding assistant. In line
   with the competition terms, it never received match data, video or extracts. It worked on code
   and on aggregate metrics printed by scripts run locally.

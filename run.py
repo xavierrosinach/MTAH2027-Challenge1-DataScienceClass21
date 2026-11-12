@@ -2,6 +2,7 @@
 
     python run.py
     python run.py --config other.yaml
+    python run.py --no-public      # no public-window table, no videos; prints the CSV's SHA256
 """
 
 import argparse
@@ -41,6 +42,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", default=os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+    parser.add_argument("--no-public", action="store_true",
+                        help="never print the public 5-minute table nor make videos (agents, "
+                             "hash checks); prints the SHA256 of the CSV instead")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -69,6 +73,11 @@ def main():
     official = cfg["paths"]["official_repo"]
     if out["validate"] and not validate(path, official):
         sys.exit("CSV failed validation")
+    if args.no_public:
+        import hashlib
+        with open(path, "rb") as handle:
+            print("SHA256 {}".format(hashlib.sha256(handle.read()).hexdigest()))
+        return
     if out["compare_public"]:
         compare(sub_dir, os.path.join(cfg["paths"]["output_dir"], "scores"), official,
                 bootstrap=out["bootstrap"])
