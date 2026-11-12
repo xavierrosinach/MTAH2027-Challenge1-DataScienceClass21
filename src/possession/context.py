@@ -607,11 +607,13 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
     H -> D -> A of one frame is cheaper than a direct hand-over whenever
     to_dead + from_dead < team_switch, and every change of possession grows a fake stoppage.
 
-    from_dead may be a scalar or a per-frame array (the cost of restarting play at frame t).
+    from_dead may be a scalar or a per-frame array (the cost of restarting play at frame t), and
+    so may team_switch (the cost of a hand-over landing at frame t).
     """
     n, k = len(e), max(1, int(min_dead))
     eh, ea, ed = e[:, H].tolist(), e[:, A].tolist(), e[:, D].tolist()
     fd = (np.broadcast_to(np.asarray(from_dead, dtype=float), (n,))).tolist()
+    ts = (np.broadcast_to(np.asarray(team_switch, dtype=float), (n,))).tolist()
     back_h = np.zeros(n, dtype=np.int8)     # 0 from H, 1 from A, 2 from D_k
     back_a = np.zeros(n, dtype=np.int8)
     back_d1 = np.zeros(n, dtype=np.int8)    # 0 from H, 1 from A
@@ -625,7 +627,7 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
         # H
         # ties go to the change: with no evidence either way, the change lands as late as
         # possible, i.e. when the new team first touches the ball, not when the old one lost it
-        c0, c1, c2 = sh, sa - team_switch, dk - fd[t]
+        c0, c1, c2 = sh, sa - ts[t], dk - fd[t]
         if c0 > c1 and c0 > c2:
             nh, bh = c0, 0
         elif c1 >= c2:
@@ -633,7 +635,7 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
         else:
             nh, bh = c2, 2
         # A
-        c0, c1, c2 = sa, sh - team_switch, dk - fd[t]
+        c0, c1, c2 = sa, sh - ts[t], dk - fd[t]
         if c0 > c1 and c0 > c2:
             na, ba = c0, 1
         elif c1 >= c2:
@@ -687,8 +689,9 @@ def decode_by_half(e, cost, blocks):
     path = np.full(len(e), D, dtype=np.int8)
     for _, first, last in blocks:
         c = dict(cost)
-        if np.ndim(c["from_dead"]):
-            c["from_dead"] = c["from_dead"][first:last + 1]
+        for key in ("from_dead", "team_switch"):
+            if np.ndim(c[key]):
+                c[key] = c[key][first:last + 1]
         path[first:last + 1] = viterbi(e[first:last + 1], **c)
     return path
 

@@ -15,6 +15,7 @@ For each config, over the bench games x seeds of one suite condition:
 """
 
 import argparse
+import copy
 import os
 import sys
 import time
@@ -26,6 +27,7 @@ import pandas as pd
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bench as B  # noqa: E402  (sets the paths)
+from possession import context  # noqa: E402
 
 FPS = 25
 BUCKETS = ((0, 2), (2, 5), (5, 10), (10, 20), (20, 1e9))
@@ -131,17 +133,61 @@ def analyse(gt, pred, pm):
     return out
 
 
+def evidence_stats(gt, pred, ev, pm):
+    """For true possessions by duration, found or missed at IoU 0.5: the mean per-frame team
+    evidence towards the true team (clipped to +/- 5) and the share of frames where it points to
+    the true team. Missed ones with evidence pointing right = the decoder drops them; pointing
+    wrong = the evidence itself is wrong."""
+    pred = np.where(gt == "X", "X", pred)
+    gc, pc = pm.label_codes(gt), pm.label_codes(pred)
+    runs = pm.valid_runs(gc)
+    gs, ps = pm.possession_spells(gc, runs), pm.possession_spells(pc, runs)
+    gflag, _ = greedy_match(pm.spell_overlaps(gs, ps), len(gs), len(ps), 0.5)
+    out = {}
+    for k, (a, b, team) in enumerate(gs):
+        v = (1 if team == 0 else -1) * ev[a:b]
+        key = "{} {}".format(BUCKET_NAMES[bucket((b - a) / FPS)], "found" if gflag[k] else "missed")
+        out["ev_n " + key] = out.get("ev_n " + key, 0) + 1
+        out["ev_mean " + key] = out.get("ev_mean " + key, 0) + np.mean(np.clip(v, -5, 5))
+        out["ev_pos " + key] = out.get("ev_pos " + key, 0) + np.mean(v > 0)
+    return out
+
+
+def handover_mask(gt, blocks, half_width):
+    """Frames within +/- half_width of a true direct H<->A hand-over."""
+    mask = np.zeros(len(gt), dtype=bool)
+    for _, first, last in blocks:
+        g = gt[first:last + 1]
+        idx = np.flatnonzero((g[1:] != g[:-1]) & np.isin(g[1:], ["H", "A"])
+                             & np.isin(g[:-1], ["H", "A"])) + 1 + first
+        for i in idx:
+            mask[max(first, i - half_width):min(last + 1, i + half_width + 1)] = True
+    return mask
+
+
 def run_job(job):
-    game, seed, bench, configs = job
+    game, seed, bench, configs, switch_oracles = job
     cfgs = [(name, B.load_config_for_game(path, game)) for name, path in configs]
     pm = B.official_metrics(cfgs[0][1])
     tr, _, gt, blocks, tags = B.load_case(game, seed, bench, cfgs[0][1]["paths"]["cache_dir"])
     rows = []
     for name, cfg in cfgs:
-        pred = B.context_labels(tr, tags, cfg, blocks)
-        row = {"model": name, "game": game, "seed": seed, **analyse(gt, pred, pm)}
+        ball = context.interpolate_ball(tr["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
+        pred, diag = context.label(tr, ball, tags, cfg, blocks, frame_period=None, verbose=False)
+        e = diag["emissions"]
+        row = {"model": name, "game": game, "seed": seed, **analyse(gt, pred, pm),
+               **evidence_stats(gt, pred, e[:, context.H] - e[:, context.A], pm)}
         row["oracle_dead"] = analyse(gt, dead_oracle(pred, gt, blocks), pm)["spellF1"]
         row["oracle_team"] = analyse(gt, team_oracle(pred, gt), pm)["spellF1"]
+        # a perfect hand-over detector: cheap switches within +/- 0.5 s of a true H<->A hand-over
+        # (only cheaper there / also dearer elsewhere)
+        near = handover_mask(gt, blocks, 12)
+        base = cfg["context"]["transition_cost"]["team_switch"]
+        for key, other in ((("oracle_switch_low", base), ("oracle_switch_both", 2.5 * base))
+                           if switch_oracles else ()):
+            c2 = copy.deepcopy(cfg)
+            c2["context"]["transition_cost"]["team_switch"] = np.where(near, 2.0, other)
+            row[key] = analyse(gt, B.context_labels(tr, tags, c2, blocks), pm)["spellF1"]
         # frames where both say alive: wrong team with the ball seen / in a ball gap
         seen = ~np.isnan(tr["ball"][:, 0])
         both = (pred != "D") & np.isin(gt, ["H", "A"])
@@ -159,7 +205,9 @@ def report(df):
     with pd.option_context("display.width", 200, "display.max_columns", 30,
                            "display.float_format", "{:.3f}".format):
         print("spellF1 and oracles (mean over runs):")
-        print(m[["spellF1", "oracle_dead", "oracle_team"]].to_string())
+        cols = [c for c in ("spellF1", "oracle_dead", "oracle_team", "oracle_switch_low",
+                            "oracle_switch_both") if c in m.columns]
+        print(m[cols].to_string())
 
         print("\nwrong team (frames both call alive): with the ball seen / in ball gaps")
         print(pd.DataFrame({
@@ -186,6 +234,20 @@ def report(df):
         print("predicted possessions per run, by predicted duration:")
         print(cnt.to_string())
 
+        rows = []
+        for model in s.index:
+            for bname in BUCKET_NAMES:
+                for kind in ("found", "missed"):
+                    key = "{} {}".format(bname, kind)
+                    n = s.loc[model].get("ev_n " + key, 0)
+                    if n:
+                        rows.append({"model": model, "true duration": bname, "": kind,
+                                     "n per run": n / n_runs,
+                                     "mean evidence": s.loc[model]["ev_mean " + key] / n,
+                                     "share frames right": s.loc[model]["ev_pos " + key] / n})
+        print("\nteam evidence inside true possessions (towards the true team):")
+        print(pd.DataFrame(rows).set_index(["model", "true duration", ""]).to_string())
+
         miss = [c for c in s.columns if c.startswith("miss_")]
         spur = [c for c in s.columns if c.startswith("spur_")]
         print("\nwhy true possessions are missed (share of all true possessions):")
@@ -206,6 +268,8 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=None)
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--out", default=None, help="CSV with one row per model x game x seed")
+    parser.add_argument("--switch-oracles", action="store_true",
+                        help="also the perfect hand-over detector oracles (3x slower)")
     args = parser.parse_args()
 
     bench = B.load_bench(args.bench)
@@ -218,7 +282,7 @@ def main():
     games = args.games or bench["games"]
     seeds = args.seeds or bench["degrade"]["seeds"]
     t0 = time.time()
-    jobs = [(g, s, bench, configs) for g in games for s in seeds]
+    jobs = [(g, s, bench, configs, args.switch_oracles) for g in games for s in seeds]
     with Pool(min(args.workers, len(jobs))) as pool:
         rows = [r for rs in pool.map(run_job, jobs) for r in rs]
     df = pd.DataFrame(rows).fillna(0)

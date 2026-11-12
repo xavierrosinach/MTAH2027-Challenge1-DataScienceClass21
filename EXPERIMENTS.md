@@ -159,6 +159,20 @@ vs 0.17-0.19 linear); 16 / 4 / l2 1e-3 gives 0.155-0.178 and 92.9-93.9 % accurac
   not to tune): 17 possessions, 2 under 2 s, 4 of 2-5 s; 12 of its 20 transitions are direct H<->A.
   Short possessions exist in the real ground truth too, a bit fewer than in the bench's fine one.
 
+### Error analysis of #5 (`validation/errors.py --switch-oracles`, condition `degraded`)
+
+- 0.564 as is; perfect stoppages 0.626; perfect team 0.854. **A perfect hand-over detector adds
+  little**: switches nearly free within +/- 0.5 s of every true H<->A hand-over gives 0.600, also
+  2.5x dearer elsewhere 0.611. Timing the switches is not the bottleneck; the evidence is.
+- Team evidence (emissions H - A, towards the true team) inside true possessions, per run:
+  missed < 2 s (95 per game, a quarter of all true possessions): mean -0.15, right on only 41 % of
+  their frames, so the evidence does not see them; missed 2-5 s (58): +0.66, 59 %; found ones of any
+  length: +2.0 to +3.3, 88-96 %. Missed 10-20 s ones have strong right evidence (+2.9, 94 %): they
+  are merged across a short rival possession that was missed, or have wrong edges.
+- Why: the model's strongest features are +/- 2 s averages, which drown a 1 s possession, and it is
+  trained with one weight per frame, so long possessions dominate; spellF1 counts each possession
+  once whatever its length.
+
 ### Tried and rejected
 
 | change | result on the bench | why rejected |
