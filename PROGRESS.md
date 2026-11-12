@@ -32,7 +32,8 @@ oficiales. CSV actual: SHA256 `00bf726c…`, 270 posesiones (media 14,0 s).
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| (ninguna todavía) | | | |
+| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | worker Claude (`C:\MTAH2027\wt-idsse`) | desde 12-nov 18:10: descarga, cargador y GT; después, entrenar con 10 partidos y banco |
+| Promedio de 5 redes con semillas distintas | `exp/semillas` | worker Claude (`C:\MTAH2027\wt-semillas`) | desde 12-nov 18:05: implementación y banco |
 
 ## Experimentos cerrados
 
@@ -50,11 +51,13 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 
 ## Cola de ideas (en orden)
 
-1. Más partidos de otros equipos con tracking + eventos, para entrenar y ampliar el banco.
-   Primero hay que comprobar la licencia y que Josep dé el OK.
-2. Promedio de varias redes entrenadas con semillas distintas.
+1. (en curso) Más partidos: IDSSE. Cumple la política general de Josep del 12-nov: descarga
+   pública sin registro (figshare) y licencia CC BY 4.0, comprobadas en la API de figshare.
+2. (en curso) Promedio de varias redes entrenadas con semillas distintas.
 3. Modelo de secuencias de toques, para las posesiones de menos de 2 s.
 4. Smart Tagging como pista de equipo.
+5. Otros datasets abiertos para más adelante: SkillCorner opendata (licencia MIT, tracking de
+   broadcast). Falta comprobar qué etiquetas trae y si sirven.
 
 ## Incidencias de reglas
 
@@ -68,8 +71,14 @@ Si un agente rompe el protocolo, se anota aquí con lo que vio y cómo se resolv
 Responde siempre en `C:\MTAH2027\DECISIONES_JOSEP.md`, a mano: es lo único que cuenta como
 aprobación y ningún agente puede escribirlo.
 
-- **Datos de otros partidos:** está propuesta una política general (datasets públicos sin registro
-  y con licencia abierta). Para activarla, cambia PENDIENTE por APROBADA en DECISIONES_JOSEP.md.
-  Mientras tanto, la línea 1 de la cola queda aparcada y se sigue con las demás.
+- **Metrica necesita su propia línea de aprobación (12-nov).** Su repo no tiene fichero de licencia.
+  El README solo dice "be responsible with the use of this data" y "acknowledge the source", así
+  que la política general (licencia abierta explícita) no la cubre. Todo lo aceptado (banco y
+  modelos v1-v4) depende de ella. Se sigue usando porque ya estaba en uso y `check_rules.py` la da
+  por aprobada. Si estás de acuerdo, añade en DECISIONES_JOSEP.md, "Aprobaciones concretas", una
+  línea como esta: "Metrica Sports sample data (3 partidos anonimizados, github
+  metrica-sports/sample-data, sin licencia explícita): aprobada para entrenar y validar, citando la
+  fuente."
+- **Política de datos de otros partidos:** APROBADA el 12-nov. IDSSE (línea 1) la cumple.
 - **Documento técnico:** decidir si se mantienen la línea sobre el asistente de IA y la del desliz
   con la tabla pública (§2.4), y añadir los nombres de los 4 miembros.
