@@ -118,7 +118,7 @@ output:
   diagnostics: false                   # imprimir los diagnósticos sin ground truth (src/possession/diagnostics.py)
 
 video:                                 # vídeos de revisión: tracking + nuestra etiqueta (letra grande arriba a la derecha)
-  enabled: true                        # generar vídeos al ejecutar run.py
+  enabled: false                       # generar vídeos al ejecutar run.py
   blocks: [2T]                         # qué bloques (prefijo del nombre): [1T_01], [1T], [2T_03, 2T_04]; [] = todos
   block_minutes: 5                     # duración de cada bloque (min)
   mode: overlay                        # overlay = vídeo real + tracking; pitch = solo campo 2D (más rápido)
