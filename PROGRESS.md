@@ -115,5 +115,12 @@ aprobación y ningún agente puede escribirlo.
   metrica-sports/sample-data, sin licencia explícita): aprobada para entrenar y validar, citando la
   fuente."
 - **Política de datos de otros partidos:** APROBADA el 12-nov. IDSSE (línea 1) la cumple.
+- **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
+  de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
+  la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
+- **Falsos positivos del guardián (worker IDSSE, 12-nov), sin consecuencias:**
+  - llamar a Python a través de una variable de PowerShell (`& $py`): se usó la ruta explícita;
+  - un mensaje de commit que nombraba el fichero de decisiones: el commit no lo tocaba y se
+    repitió sin nombrarlo.
 - **Documento técnico:** decidir si se mantienen la línea sobre el asistente de IA y la del desliz
   con la tabla pública (§2.4), y añadir los nombres de los 4 miembros.
