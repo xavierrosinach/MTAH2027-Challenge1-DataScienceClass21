@@ -73,7 +73,7 @@ context:
                                        #   respecto al balón (EXPERIMENTS.md #4); long y touch, descartados
     model_type: mlp                    # `model` es una red antisimétrica (1 capa oculta) para frames con balón
     mlp: {hidden: 16, epochs: 4, l2: 0.001, lr: 0.002, batch: 2048, seed: 0}   # elegido por log-loss en partido no visto
-    ensemble: [models/control_v2.json] # se promedia con el logit lineal v2 (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
+    ensemble: []                       # se promedia con el logit lineal v2 (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
     replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
     weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
     gap_weight: 0.0                    # peso por frame sin balón (solo la forma de los equipos)
