@@ -15,6 +15,7 @@ python validation/calibrate.py [--grid]                              # how the d
 python validation/train_control.py                                   # learnt control model (models/control.json)
 python validation/check_control.py                                   # its features on BAR-ATH vs the bench (aggregates)
 python validation/errors.py --configs ref=a.yaml new=b.yaml          # where spellF1 is lost (oracles, durations, causes)
+python validation/compare.py x.csv --ref ref --new new              # paired difference of two versions in a bench CSV
 python validation/check_bar.py --configs ref=a.yaml new=b.yaml       # label-free effect on BAR-ATH (stoppages, Smart Tagging)
 python validation/train_dead.py / check_dead.py                      # learnt dead-ball model (#7, rejected, off)
 ```
@@ -89,6 +90,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/peso-0.5`, `peso-1` | 6 | stronger weighting (coarseGT) |
 | `descartado/control/rasgos-short` | 6 | half-second features on v4 |
 | `descartado/muerto/modelo-aprendido` | 7 | learnt dead-ball model, on (does not transfer) |
+| `descartado/control/semillas` | 8 | mean of 5 networks with different seeds (noise) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -241,6 +243,15 @@ nearest player) plus the default rules' output, replacing the default evidence. 
   table; the decision rests on the label-free checks above, and exploratory runs now use
   `check_bar.py`. The accepted #2-#6 pass `check_bar.py` unchanged: 103-104 stoppages, 96.6 % of
   set pieces with a stoppage; possessions 246 (#3) -> 254 -> 267 -> 270 (#6).
+
+Entry 8, **rejected** (tag `descartado/control/semillas`; code kept, off: `context.control.mlp_seeds`):
+the network of #6 replaced by the mean of K networks trained identically with different seeds
+(the mean then averaged 50/50 with the linear model, as before). Held-out log-loss improves a little
+(game 3 0.179 -> 0.175 with K=5) and not further with K=10. Bench, paired over 48 runs vs #6 (0.6128):
+K=5 0.6138, +0.0010 (se 0.0010, 48 % of runs better; light -0.0013, degraded +0.0027, +tags -0.0008,
+coarseGT +0.0034; 9/12 cells; game 1 loses under 3 of 4 conditions); K=10 +0.0008 (se 0.0012, light
+-0.0019, +tags -0.0006, 7/12). Noise: the network's seed is not where the error is. With `[0]` the
+code retrains byte-identical v4 files.
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 
