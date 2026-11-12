@@ -736,7 +736,7 @@ def label(tracking, ball, tags, cfg, blocks, frame_period=None, verbose=True):
         from .config import REPO_ROOT
         path = ctl["model"] if os.path.isabs(ctl["model"]) else os.path.join(REPO_ROOT,
                                                                               ctl["model"])
-        llr, seen = control.control_llr(tracking, ball, blocks, path)
+        llr, seen = control.control_llr(tracking, ball, blocks, path, control.feature_groups(cfg))
         llr = np.clip(llr, -ctl["clip"], ctl["clip"])
         add_team_llr(e, np.where(seen, ctl["weight"], ctl["gap_weight"]) * llr)
         if verbose:

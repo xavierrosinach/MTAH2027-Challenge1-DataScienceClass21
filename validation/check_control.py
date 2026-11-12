@@ -30,7 +30,7 @@ def features(tr, blocks, cfg):
     ball = context.interpolate_ball(tr["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
     tr = dict(tr)
     tr["team_frame"], _ = context.keeper_teams(tr, blocks, cfg)
-    names, g_h, g_a, seen = control.team_features(tr, ball, blocks)
+    names, g_h, g_a, seen = control.team_features(tr, ball, blocks, control.feature_groups(cfg))
     graded = np.zeros(len(ball), bool)
     for _, a, b in blocks:
         graded[a:b + 1] = True
@@ -51,9 +51,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--bench", default=os.path.join(HERE, "bench.yaml"))
     parser.add_argument("--config", default=os.path.join(B.REPO, "config.yaml"))
-    parser.add_argument("--model", default=os.path.join(B.REPO, "models", "control.json"))
+    parser.add_argument("--model", default=None,
+                        help="model file (default: context.control.model of the config)")
     args = parser.parse_args()
     cfg = load_config(args.config)
+    if args.model is None:
+        args.model = os.path.join(B.REPO, cfg["context"]["control"]["model"])
     bench = B.load_bench(args.bench)
     names, models = control.load(args.model)
     sd = models["seen"][0]

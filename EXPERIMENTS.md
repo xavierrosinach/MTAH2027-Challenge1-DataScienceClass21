@@ -14,7 +14,13 @@ python validation/sweep.py context.transition_cost.team_switch 12 16 # one param
 python validation/calibrate.py [--grid]                              # how the degradation was chosen
 python validation/train_control.py                                   # learnt control model (models/control.json)
 python validation/check_control.py                                   # its features on BAR-ATH vs the bench (aggregates)
+python validation/errors.py --configs ref=a.yaml new=b.yaml          # where spellF1 is lost (oracles, durations, causes)
 ```
+
+Each control model file gets its own leave-one-game-out copies in
+`outputs/validation/control/<model file name>/`, so versions with different features
+(`context.control.features`) can be benched side by side. Experiments live on `exp/...` branches;
+only what passes the decision rule is merged into `josep/mejoras`.
 
 - **Games**: the three public Metrica Sports sample matches (anonymised, 25 fps, 105 x 68 m,
   tracking + event data). Not BAR-ATH.
@@ -94,6 +100,22 @@ controls the ball, learnt on the other games:
 - Tried on top and not kept (all within +-0.006, i.e. bench noise): `team_switch` 10 / 13 / 20 / 24
   (+0.006 but loses coarseGT / +0.004 / -0.006 / -0.010); gap model weight 0.1 / 0.3 / 0.6
   (+0.001 / +0.003 / +0.003); keeping the nearest-player evidence as well (-0.000, 5/12).
+
+### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
+
+- **Oracles**: 0.540 as is; 0.602 with perfect stoppages (our teams); **0.853 with the perfect team**
+  (our stoppages). The work that pays is *who has the ball*, not dead-ball detection.
+- Wrong team on 7.0 % of the frames both call alive with the ball seen, 21.7 % in ball gaps; gaps
+  are 9.6 % of those frames, so 75 % of team errors happen with the ball visible.
+- 241 predicted vs 384 true possessions: still under-segmented. True possessions found at IoU 0.5:
+  < 2 s 8 %, 2-5 s 35 %, 5-10 s 62 %, 10-20 s 76 %, > 20 s 77 % (< 2 s are 27 % of all true
+  possessions, 2-5 s 25 %). Missed: 22 % of true possessions mostly given to the rival, 23 % right
+  team but merged with neighbours or wrong edges, 8 % called dead.
+- Hand-overs with a predicted one of the same kind within 1 / 2 / 5 s: 34 / 44 / 54 % (main: 16 /
+  25 / 37 %).
+- For scale, the public BAR-ATH window (aggregates of the public file, to understand the definition,
+  not to tune): 17 possessions, 2 under 2 s, 4 of 2-5 s; 12 of its 20 transitions are direct H<->A.
+  Short possessions exist in the real ground truth too, a bit fewer than in the bench's fine one.
 
 ### Tried and rejected
 

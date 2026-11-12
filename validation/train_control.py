@@ -6,7 +6,7 @@ Training data: every live frame (event-derived ground truth, validation/gt_event
 Metrica games, with their tracking degraded as in the bench's `degraded` condition, with seeds the
 bench does not use. Writes
   - models/control.json: trained on all the games; the one run.py uses on BAR-ATH;
-  - outputs/validation/control/logo_<game>.json: trained without <game>. The bench uses it to
+  - outputs/validation/control/<model name>/logo_<game>.json: trained without <game>. The bench uses it to
     label <game>, so no score of the bench comes from a game the model was trained on.
 Prints, for each held-out game, per-frame accuracy on its live frames next to the nearest-player
 rule (aggregate numbers only).
@@ -46,7 +46,7 @@ def game_data(job):
     tr = dict(tr)
     if cfg["context"]["keepers"]["enabled"]:
         tr["team_frame"], _ = context.keeper_teams(tr, blocks, cfg)
-    names, g_h, g_a, seen = control.team_features(tr, ball, blocks)
+    names, g_h, g_a, seen = control.team_features(tr, ball, blocks, control.feature_groups(cfg))
     f = context.frame_features(tr, ball, B.no_tags(), cfg)
     live = np.isin(gt, ["H", "A"])
     return {"game": game, "seed": seed, "names": names, "X": (g_h - g_a)[live],
@@ -86,11 +86,15 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=list(TRAIN_SEEDS),
                         help="degradation seeds of the training copies")
     parser.add_argument("--no-save", action="store_true", help="only print the held-out scores")
-    parser.add_argument("--out", default=os.path.join(B.REPO, "models", "control.json"))
+    parser.add_argument("--out", default=None,
+                        help="model file (default: context.control.model of the config)")
     args = parser.parse_args()
     seeds = tuple(args.seeds)
     bench = B.load_bench(args.bench)
     cfg = load_config(args.config)
+    if args.out is None:
+        args.out = os.path.join(B.REPO, cfg["context"]["control"]["model"])
+    print("features {} -> {}".format(list(control.feature_groups(cfg)), args.out))
     games = bench["games"]
     t0 = time.time()
     jobs = [(g, s, bench, args.config) for g in games for s in seeds + (EVAL_SEED,)]
@@ -101,7 +105,7 @@ def main():
     print("features: {} per team, {} live frames per game x seed  ({:.0f} s)".format(
         len(names), int(np.mean([len(p["y"]) for p in parts])), time.time() - t0))
 
-    logo_dir = os.path.join(cfg["paths"]["output_dir"], "validation", "control")
+    logo_dir = B.logo_dir(cfg, args.out)
     os.makedirs(logo_dir, exist_ok=True)
     rows = []
     info = {"seeds": list(seeds), "l2": args.l2, "degrade": bench["degrade"]}

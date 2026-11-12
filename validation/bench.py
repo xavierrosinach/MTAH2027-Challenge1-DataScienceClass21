@@ -120,23 +120,27 @@ def score(gt, pred, pm):
             "alive_dead_f1": r["alive_dead_f1"], "team_acc": r["team_acc_gt_alive"]}
 
 
-def run_job(job):
-    """One game x one degradation seed: every model on it. Runs in a worker process."""
-    game, seed, bench, configs, baselines = job
-    cfgs = [(name, load_config(path)) for name, path in configs]
-    for _, cfg in cfgs:
-        ctl = cfg["context"].get("control") or {}
-        if ctl.get("enabled"):
-            # the learnt control model, trained WITHOUT this game (validation/train_control.py)
-            ctl["model"] = os.path.join(cfg["paths"]["output_dir"], "validation", "control",
-                                        "logo_{}.json".format(game))
-            if not os.path.isfile(ctl["model"]):
-                raise FileNotFoundError("run validation/train_control.py first: " + ctl["model"])
-    base_cfg = cfgs[0][1]
-    sys.path.insert(0, os.path.join(base_cfg["paths"]["official_repo"], "evaluation"))
-    import possession_metrics as pm
+def logo_dir(cfg, model_path):
+    """Where train_control.py writes the leave-one-game-out copies of a control model: one folder
+    per model file name, so versions with different features can be benched side by side."""
+    stem = os.path.splitext(os.path.basename(model_path))[0]
+    return os.path.join(cfg["paths"]["output_dir"], "validation", "control", stem)
 
-    tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=base_cfg["paths"]["cache_dir"])
+
+def load_config_for_game(path, game):
+    """A labeller config whose learnt control model (if any) was trained WITHOUT this game."""
+    cfg = load_config(path)
+    ctl = cfg["context"].get("control") or {}
+    if ctl.get("enabled"):
+        ctl["model"] = os.path.join(logo_dir(cfg, ctl["model"]), "logo_{}.json".format(game))
+        if not os.path.isfile(ctl["model"]):
+            raise FileNotFoundError("run validation/train_control.py first: " + ctl["model"])
+    return cfg
+
+
+def load_case(game, seed, bench, cache_dir):
+    """(tracking, events, gt, blocks, tags) of one game under one degradation seed."""
+    tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cache_dir)
     events = metrica.load_events(bench["metrica_dir"], game)
     gt, blocks = gt_events.ground_truth(events, tr["n_frames"],
                                         (bench.get("gt") or {}).get("min_spell_s", 0.0))
@@ -144,6 +148,22 @@ def run_job(job):
         tr = deg.degrade(tr, gt, bench["degrade"], seed)
     tags = (synthetic_tags(events, blocks, bench["synthetic_tags"], 0 if seed is None else seed)
             if bench["tags"] == "events" else no_tags())
+    return tr, events, gt, blocks, tags
+
+
+def official_metrics(cfg):
+    sys.path.insert(0, os.path.join(cfg["paths"]["official_repo"], "evaluation"))
+    import possession_metrics as pm
+    return pm
+
+
+def run_job(job):
+    """One game x one degradation seed: every model on it. Runs in a worker process."""
+    game, seed, bench, configs, baselines = job
+    cfgs = [(name, load_config_for_game(path, game)) for name, path in configs]
+    base_cfg = cfgs[0][1]
+    pm = official_metrics(base_cfg)
+    tr, events, gt, blocks, tags = load_case(game, seed, bench, base_cfg["paths"]["cache_dir"])
 
     rows = []
     if baselines:

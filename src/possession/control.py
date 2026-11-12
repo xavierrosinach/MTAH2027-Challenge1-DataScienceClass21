@@ -31,6 +31,9 @@ FPS = 25
 WINDOWS = (("now", 0, 0), ("past1", -25, -1), ("next1", 1, 25), ("c2", -50, 50))
 BALL_FEATURES = ("near1", "near2p5", "near6", "second2p5", "n5", "n10", "goalside")
 SHAPE_FEATURES = ("centre", "spread_x", "spread_y", "speed", "front", "back", "advance")
+# extra feature groups (context.control.features), each a function -> (names, E_H, E_A)
+EXTRA = {}
+GROUPS = ("base",)
 
 
 def window_nanmean(x, lo, hi):
@@ -57,11 +60,23 @@ def attack_sign(tracking, blocks):
     return sign
 
 
-def team_features(tracking, ball, blocks):
-    """(names, G_H, G_A): per frame, the features of each team, (N, K) each.
+def feature_groups(cfg):
+    """The feature groups a config asks the control model for (context.control.features)."""
+    ctl = cfg["context"].get("control") or {}
+    groups = tuple(ctl.get("features") or ("base",))
+    unknown = [g for g in groups if g not in GROUPS]
+    if unknown or groups[0] != "base":
+        raise ValueError("control features must start with 'base', known {}: {}".format(
+            GROUPS, groups))
+    return groups
+
+
+def team_features(tracking, ball, blocks, groups=("base",)):
+    """(names, G_H, G_A, seen): per frame, the features of each team, (N, K) each.
 
     Ball features are NaN on frames without a ball before windowing; after it, NaN becomes 0
-    (equal for both teams, so it adds nothing to the difference).
+    (equal for both teams, so it adds nothing to the difference). `groups` beyond "base" append
+    more columns after the base ones (the base ones never change, so older models stay valid).
     """
     from .context import team_shape_features
 
@@ -118,6 +133,11 @@ def team_features(tracking, ball, blocks):
     names = per_team[0][0] + ["shape_" + s for s in SHAPE_FEATURES]
     g_h = np.column_stack([per_team[0][1], shape[:, :k]])
     g_a = np.column_stack([per_team[1][1], shape[:, k:2 * k]])
+    for group in groups[1:]:
+        extra_names, e_h, e_a = EXTRA[group](tracking, ball, blocks, seen, dist, team, sign_h)
+        names = names + extra_names
+        g_h = np.column_stack([g_h, e_h])
+        g_a = np.column_stack([g_a, e_a])
     return names, g_h, g_a, seen
 
 
@@ -158,9 +178,9 @@ def load(path):
     return m["features"], models
 
 
-def control_llr(tracking, ball, blocks, path):
+def control_llr(tracking, ball, blocks, path, groups=("base",)):
     """(N,) H-vs-A log-odds from the learnt model, and the ball-seen mask."""
-    names, g_h, g_a, seen = team_features(tracking, ball, blocks)
+    names, g_h, g_a, seen = team_features(tracking, ball, blocks, groups)
     want, models = load(path)
     if list(want) != list(names):
         raise ValueError("control model {} was trained on other features".format(path))
