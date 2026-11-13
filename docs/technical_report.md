@@ -149,6 +149,17 @@ missing, added +0.001 to +0.002 more (**0.636** on seeds 12-15, macroF1 0.857).
   label-free checks (§3, learnt dead-ball model). Since then, exploratory runs on our match use
   `check_bar.py`, and regenerating the file uses `run.py --no-public`. Neither loads the public
   ground truth.
+- **Pre-registration (from 13-nov).** Before measuring, each experiment's hypothesis, its single
+  change and its acceptance rule are written and committed in EXPERIMENTS.md.
+  - There are three outcomes: accepted, rejected, or doubtful. A doubtful result gets one more
+    round on new seeds; if it is still doubtful, it is rejected.
+  - A threshold is never changed after seeing a result. When one proved mis-specified, it was
+    applied as written to that experiment, and corrected in writing only for later ones. Twice:
+    the stoppage check for changes that do not touch the dead ball, and the log-loss screen for
+    model changes.
+  - An outside model (OpenAI Codex, given only the method and aggregate numbers, never match
+    data) critiqued each decision before it was closed. Its objections are answered in
+    EXPERIMENTS.md.
 - **Experiment record.** Each experiment is developed on its own branch, `exp/<idea>`.
   - Once decided, it is kept as a tag, `aceptado/<group>/<idea>` or `descartado/<group>/<idea>`.
   - Each rejected tag reproduces its variant.
@@ -199,6 +210,11 @@ Tried and dropped, with the bench numbers in EXPERIMENTS.md:
 - **Training on 10 more matches from a third provider** (SkillCorner open data, broadcast
   tracking, MIT licence). Their possession labels are coarser (2.6 per minute). The model learnt
   to cut coarser and lost 0.006 on the bench. Its data and code are kept in a tag, unused.
+- **More weight on the learnt team evidence (1.5, 2).** It cut finer and lost with the coarse
+  ground truth.
+- **A larger network (32 hidden units) on 10 matches.** Its held-out log-loss was worse.
+- **Re-weighting the team-shape evidence in ball gaps, and a network for the frames without the
+  ball.** Both were noise on the bench.
 - **A dead-ball model learnt on the Metrica games.** It gave +0.017 on the bench but did not
   transfer to our match: fewer stoppages (104 → 93) and fewer Smart Tagging set pieces with a
   stoppage (96.6 → 91.4 %). The code is kept, switched off (`context.dead_model`).
@@ -319,9 +335,10 @@ paired gain of +0.013 (standard error 0.002). Over the 10 matches (Metrica + IDS
 gained more (+0.005) but moved one stoppage on our match, and was rejected by the rule written
 before measuring.
 
-Each accepted step improved all 4 conditions and 10 to 12 of the 12 cells. The last ones gained
-0.006–0.013 each, with paired standard errors of 0.0008–0.0022. On a single full match, spellF1
-noise is about ±0.04, which is why decisions use paired comparisons over 48 bench runs.
+Each accepted step improved all 4 conditions, and 7 to 12 of the 12 cells in every round it was
+measured on. The last ones gained 0.002–0.013 each, with paired standard errors of
+0.0004–0.0022. On a single full match, spellF1 noise is about ±0.04, which is why decisions use
+paired comparisons over 48 bench runs.
 
 On our match, label-free aggregates of the current version:
 
@@ -349,13 +366,23 @@ Submission file: H 55,377 / A 39,316 / D 64,164 / X 40,462 frames. SHA256
 - **Some rule constants were not validated individually.** Many dead-ball and pass constants were
   set by reasoning about football and inspecting data, without hand labels. Only some were swept
   on the bench.
-- **The granularity of the real ground truth is unknown.** Settings that cut possessions finer win
-  with a fine ground truth and lose with a coarse one, so we only keep what wins under both.
+- **The granularity of the real ground truth is unknown.**
+  - Settings that cut possessions finer win with a fine ground truth and lose with a coarse one,
+    so we only keep what wins under both.
+  - Five changes failed exactly this way: stronger possession weighting, cheaper hand-overs,
+    cleaner training copies, more weight on the team evidence, and, the other way round, coarser
+    training labels.
+  - CHALLENGE.md asks for *controlled* possession (a few seconds, or more than two passes), which
+    argues against cutting finer.
+- **Learnt dead-ball models do not transfer.** Twice (3 and 10 matches) they won on the bench and
+  lost real stoppages on our match. Only the speed model fitted on our own match, with rule-made
+  pseudo-labels, is used.
 - **Next steps:**
-  - more open matches with tracking and events, to train on and to widen the bench;
-  - a sequence model over touch sequences;
-  - a dead-ball model trained on degradations that reproduce our stoppages;
-  - Smart Tagging phases as a prior on the team.
+  - more open matches whose ground truth is built like the official one (ball status and
+    possession from the tracking), at a similar granularity;
+  - a degradation that reproduces our stoppages (when the ball is seen or lost in dead time), so
+    that dead-ball changes can be validated off our match;
+  - evidence for short possessions: on the bench, the features do not see the < 2 s ones at all.
 
 ## 8. Reproduction
 
