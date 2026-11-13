@@ -1083,3 +1083,35 @@ stoppage late.
 
 *What we learn (#23):* a small, specific rule that makes a restart visible pays on every seed and
 condition. It is the first of Xavier's ideas to pass, and the first dead-ball change since #9.
+
+**Result of #21 (13-nov), REJECTED by its written cap: tag `descartado/xavier/hueco-parada-15m`.**
+- Sweep, seeds 0-3, vs `josep/mejoras` (#23), all with `gap_restart.enabled` on and `min_s` 3:
+
+  | `max_move_m` | spellF1 | macroF1 | cells | possessions |
+  |--:|--:|--:|--:|--:|
+  | 5 | +0.0129 (se 0.0015) | +0.0105 | 12/12 | +3 |
+  | 10 | +0.0267 (se 0.0023) | +0.0204 | 12/12 | +7 |
+  | 15 | +0.0315 (se 0.0029) | +0.0247 | 12/12 | +8 |
+
+  All three pass. The rule takes the higher mean: 15 m.
+- `check_bar` for 15 m:
+  - possessions 270 -> 285;
+  - dead share 40.3 -> 46.4 % (cap 50 %, passes);
+  - **stoppages 106 -> 136 (cap 130: fails)**;
+  - set pieces with a stoppage 96.6 % (unchanged).
+- The cap, written before measuring, is the upper end of real matches with tracking-derived
+  ground truth (92-113 stoppages per IDSSE game). 136 is beyond it, and the check is
+  deterministic: rejected. 15 m turns too many ball gaps on our match into stoppages.
+
+### #27 `gap_restart` at 10 m, confirmatory only (branch `exp/x27`)
+
+Pre-registered 13-nov, before any further measurement, as for #16.
+- **Change:** `gap_restart.enabled` on, `max_move_m` 10. `min_s` 3 and `llr` 1.5 as in the code's
+  defaults. Measured against `josep/mejoras` (#23).
+- **The earlier result does not count.** 10 m was seen in #21's sweep (+0.0267 on seeds 0-3), and
+  15 m failed the cap. The decision rests only on new measurements:
+  - Metrica bench on seeds 8-11 and on seeds 12-15, each with the usual rule (up under each of
+    the 4 conditions, >= 7/12 cells, macroF1 not down, game 3 not down);
+  - `check_bar` with the dead-ball checks: 240-300 possessions; stoppages and set pieces with a
+    stoppage not below the current version; dead share <= 50 %; stoppages <= 130.
+- **Outcomes:** all pass -> accepted; anything fails -> rejected (no doubtful round).
