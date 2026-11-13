@@ -1,10 +1,10 @@
-"""Train the learnt dead-ball model (src/possession/dead.py) on the Metrica sample games.
+"""Train the learnt dead-ball model (src/possession/dead.py) on the bench games.
 
-    python validation/train_dead.py [--config config.yaml]
+    python validation/train_dead.py [--config config.yaml] [--bench bench.yaml]
 
-Training data: every graded frame of the Metrica games (dead = the event-derived ground truth says
-D), tracking degraded as in the bench's `degraded` condition with seeds the bench does not use,
-no Smart Tagging. Writes
+Training data: every graded frame of the bench games (dead = their ground truth says D: derived
+from the events for Metrica, the tracking's BallStatus for IDSSE), tracking degraded as in the
+bench's `degraded` condition with seeds the bench does not use, no Smart Tagging. Writes
   - context.dead_model.model of the config: trained on all the games; the one run.py uses;
   - outputs/validation/dead/<model name>/logo_<game>.json: trained without <game>, for the bench.
 Prints, for each held-out game, aggregate scores of the learnt model next to the default dead-ball
@@ -24,8 +24,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bench as B  # noqa: E402  (sets the paths)
 import degrade as deg  # noqa: E402
-import gt_events  # noqa: E402
-import metrica  # noqa: E402
 from possession import context, dead  # noqa: E402
 from possession.config import load_config  # noqa: E402
 
@@ -50,9 +48,7 @@ def game_data(job):
     if variant:
         bench = B._merge(bench, bench["suite"][variant])
     cfg = load_config(cfg_path)
-    tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cfg["paths"]["cache_dir"])
-    gt, blocks = gt_events.ground_truth(metrica.load_events(bench["metrica_dir"], game),
-                                        tr["n_frames"])
+    tr, _, gt, blocks = B.load_game(bench, game, cfg["paths"]["cache_dir"])  # Metrica or IDSSE
     tr = deg.degrade(tr, gt, bench["degrade"], seed)
     ball = context.interpolate_ball(tr["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
     tr = dict(tr)

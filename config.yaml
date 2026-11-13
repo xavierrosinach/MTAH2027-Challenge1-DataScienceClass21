@@ -29,9 +29,10 @@ context:
     live_ball_speed: 1.0               #   y el balón moviéndose a > 1 m/s
 
   dead_model:                          # balón muerto aprendido en OTROS partidos (src/possession/dead.py)
-    enabled: false                     #   sustituye a dead_weight + reglas ball_dead (que pasan a ser un rasgo)
-    model: models/dead_v1.json         #   pesos (validation/train_dead.py; Metrica degradado, nunca BAR-ATH)
-    weight: 1.0                        #   peso por frame de su log-odds
+    enabled: true                      #   sustituye a dead_weight + reglas ball_dead (que pasan a ser un rasgo)
+    model: models/dead_v2.json         #   EXPERIMENTS.md #13: 10 partidos con el balón escondido en tiempo muerto
+    weight: 0.5                        #   peso por frame de su log-odds
+    train_mix: [light]                 #   entrenado también con copias light (como #7)
     clip: 5.0                          #   límite por frame
 
   dead_weight: 0.3                     # peso por frame del modelo de balón muerto (velocidad de los jugadores); 0.5 -> 0.3: banco, EXPERIMENTS.md #9
