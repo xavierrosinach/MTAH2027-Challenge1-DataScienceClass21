@@ -41,7 +41,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #18 peso de la forma de los equipos en los huecos (`shape.weight` 0.05 / 0.2) | `exp/forma` | coordinador (`C:/MTAH2027/wt-forma`) | barrido en Metrica, semillas 0-3, en marcha |
+| #19 red de 32 neuronas con 10 partidos | `exp/red32` | coordinador (`C:/MTAH2027/wt-red32`) | entrenando; luego, pérdida logarítmica en los partidos no vistos y bancos. Después, #20 (red también para los huecos) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -115,6 +115,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | datos | `descartado/datos/v9-skillcorner` | modelo de control con 20 partidos (+10 SkillCorner) | −0.0063 (error típico 0.0015), 1/12 celdas, −6,7 posesiones | descartada: su GT grueso enseña a cortar más grueso |
 | 13-nov | huecos | `aceptado/huecos/gap-weight-01` | evidencia de equipo en los huecos, peso 0.1 (confirmación con semillas nuevas) | 8-11 +0.0011, 12-15 +0.0019; check_bar 105 paradas (umbral ±2) | **aceptada (actual)** |
 | 13-nov | control | `descartado/control/peso-v6` | peso de la evidencia de equipo 1.5 / 2 con v6 | +0.002 / +0.003, pero coarseGT −0.009 / −0.016 | descartada: corta más fino (5.º caso) |
+| 13-nov | huecos | `descartado/huecos/forma` | peso de la forma en los huecos 0.05 / 0.2 | 0.2: +0.0010 dudoso; semillas 8-11 −0.0003 | descartada: ruido |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 

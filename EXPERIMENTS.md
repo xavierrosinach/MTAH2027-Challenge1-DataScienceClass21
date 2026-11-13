@@ -101,6 +101,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/datos/v9-skillcorner` | 15 | control model trained on 20 games, SkillCorner added (coarser cuts) |
 | `aceptado/huecos/gap-weight-01` | 16 | team evidence of the gap model, weight 0.1, confirmed on new seeds (current) |
 | `descartado/control/peso-v6` | 17 | weight of the learnt team evidence 1.5 / 2 on v6 (cuts finer) |
+| `descartado/huecos/forma` | 18 | weight of the team-shape evidence in gaps 0.05 / 0.2 (noise) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -898,3 +899,32 @@ then.
   4. `check_control` (relative, as #15 (d)).
   5. `check_bar` with the corrected threshold for non-dead-ball changes.
   6. Doubtful: seeds 8-11.
+
+**Result of #18 (13-nov), REJECTED: tag `descartado/huecos/forma`.**
+- Sweep, seeds 0-3, vs v6 + `gap_weight` 0.1:
+  - 0.05: −0.0012 (se 0.0005), 1/12 cells;
+  - 0.2: +0.0010 (se 0.0004), but light −0.0001 and macroF1 −0.0000, 8/12: doubtful.
+- Extra round for 0.2, seeds 8-11: −0.0003 (se 0.0003), 29 % of runs better, the 4 conditions
+  between −0.0006 and 0.0000.
+
+*Codex (consulta-11):* the rejection is right. Do not conclude the effect is exactly zero, only
+that the evidence does not justify it. The paired unit (condition × game × seed run) is the same
+as in every other comparison.
+
+*What we learn (#18):* the hand-set shape weight is at a flat point; nothing to gain there.
+
+### #20 the gap part of the control model as a network too (branch `exp/gap-red`)
+
+Pre-registered 13-nov, before measuring (Codex, consulta-11, path 2). Runs after #19 closes,
+against `josep/mejoras` as it is then.
+- **Change:** the model for frames without the ball, today a conditional logit (its output is
+  used with weight 0.1, #16), becomes the same antisymmetric network as the one for frames with
+  the ball (16 tanh units, same settings), trained on the same gap frames of the 10 games.
+  `gap_weight` stays 0.1. New option `context.control.gap_model_type: mlp`; absent, nothing
+  changes. Models `control_v11_*`.
+- **Reason:** gap evidence proved useful (#16) with a linear model. In frames with the ball, the
+  network beat the linear model (#5). Errors in gaps are still 19.7 % vs 5.8 % with the ball.
+- **Rule:**
+  1. Held-out log-loss on gap frames lower than the linear gap model's, same code. If not,
+     rejected without a bench.
+  2. As #19 2-6.
