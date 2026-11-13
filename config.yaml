@@ -56,7 +56,7 @@ context:
     isolated_s: 2.0                    #   durante 2 s -> nadie lo está jugando
     isolated_llr: 1.5                  #   evidencia de muerto por frame
     isolated_backdate: false           # true: la parada empieza cuando el balón se queda solo, no 2 s después
-    isolated_max_player_speed: null    #   ...y solo si los jugadores van despacio (media 2 s < X m/s); null = sin condición.
+    isolated_max_player_speed: 1.5     #   #25: ...y solo si los jugadores van despacio (media 2 s < 1,5 m/s)
                                        #   Balón quieto y solo mientras todos corren = balón falso del tracking. Probar 1.6 (SIN VALIDAR en el banco)
     kick_speed: 6.0                    # golpeo: balón visto dentro del campo a > 6 m/s -> el juego (re)empieza
     kick_llr: 2.0                      #   evidencia de vivo por frame del golpeo
