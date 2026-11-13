@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 (noche)
+**Actualizado:** 2026-11-13 21:15
 
 **Calendario:**
 
@@ -17,7 +17,8 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 
 | | banco spellF1 | banco macroF1 |
 |---|--:|--:|
-| **actual: + saque desde la línea (#23, idea de Xavier)** (13-nov) | **+0.0023 / +0.0032** ³ | **+0.0008** ³ |
+| **actual: + hueco que es parada a 10 m (#27, idea de Xavier)** (13-nov) | **+0.027 / +0.029** ⁴ | **+0.021** ⁴ |
+| + saque desde la línea (#23, idea de Xavier) (13-nov) | +0.0023 / +0.0032 ³ | +0.0008 ³ |
 | v6 + evidencia de equipo en los huecos (`gap_weight` 0.1) (13-nov) | 0.636 ² | 0.857 ² |
 | v6 = modelo entrenado con 10 partidos (Metrica + IDSSE) (13-nov) | 0.629 ¹ | 0.856 ¹ |
 | v4 + `dead_weight` 0.3 (13-nov) | 0.619 | 0.855 |
@@ -31,13 +32,15 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 ² Semillas 12-15, donde v6 saca 0.634: +0.0019 (en las 8-11, +0.0011). Ganancia pequeña pero
 constante.
 ³ Ganancia emparejada sobre la versión anterior: semillas 0-3 (0.6322 -> 0.6345) y 4-7.
+⁴ Semillas 8-11 y 12-15 (confirmación). En el banco IDSSE con el balón escondido en tiempo muerto,
++0.024. En BAR-ATH: 130 paradas (antes 106), justo en el tope.
 
 Mejora aproximada (las semillas no son las mismas): **+38 %** sobre main y **+97 %** sobre el
 baseline oficial (banco de Metrica).
 
 Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking degradado como el
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
-oficiales. CSV actual: SHA256 `744deca5…`, 270 posesiones (media 14,0 s), 106 paradas.
+oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 paradas, 45,4 % muerto.
 
 ## Resumen a 13-nov 17:40 (para la decisión del 16)
 
@@ -66,7 +69,7 @@ oficiales. CSV actual: SHA256 `744deca5…`, 270 posesiones (media 14,0 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier: #27 hueco que es parada a 10 m, solo confirmación | `exp/x27` | coordinador (`C:/MTAH2027/wt-x27`) | pasa todo lo registrado (semillas 8-11 +0.027, 12-15 +0.029, 12/12; check_bar 130 paradas, en el tope). Por la crítica de Codex 18, falta un control extra más estricto, registrado antes de medirlo: banco IDSSE con el balón escondido en tiempo muerto (en marcha). Luego #28, #24, #26 y #25 |
+| Ideas de Xavier: #28 parada mínima de 3 s encima de #27 | `exp/x28` | coordinador (`C:/MTAH2027/wt-x28`) | semillas 8-11 en marcha. #27 aceptada. Luego #24, #26 y #25 |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -145,8 +148,9 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | control | `descartado/control/red-32` | red de 32 neuronas con 10 partidos | pérdida logarítmica de la red 0.2132 frente a 0.2120 | descartada en la regla 1, sin banco |
 | 13-nov | huecos | `descartado/huecos/red-huecos` | red también para los frames sin balón | mejor pérdida logarítmica en huecos, pero +0.0001 en el banco (dudoso dos veces) | descartada |
 | 13-nov | xavier | `descartado/xavier/parada-minima-3s` | parada mínima de 3 s (idea de Xavier) | +0.0045 (semillas 0-3), +0.0042 (4-7), 12/12 | descartada por su control: en BAR-ATH paradas 105 -> 100 y un saque de puerta sin parada |
-| 13-nov | xavier | `aceptado/xavier/saque-linea` | un golpeo de un balón pegado a la línea reanuda (idea de Xavier) | +0.0023 (semillas 0-3), +0.0032 (4-7), 12/12 en las dos rondas | **aceptada (actual)** |
+| 13-nov | xavier | `aceptado/xavier/saque-linea` | un golpeo de un balón pegado a la línea reanuda (idea de Xavier) | +0.0023 (semillas 0-3), +0.0032 (4-7), 12/12 en las dos rondas | aceptada |
 | 13-nov | xavier | `descartado/xavier/hueco-parada-15m` | hueco que es parada, radio 15 m (idea de Xavier) | 5 / 10 / 15 m: +0.013 / +0.027 / +0.032 (semillas 0-3, 12/12) | descartada: 136 paradas en BAR-ATH, tope 130. 10 m se confirma aparte (#27) |
+| 13-nov | xavier | `aceptado/xavier/hueco-parada-10m` | hueco que es parada, radio 10 m (idea de Xavier, confirmación) | semillas 8-11 +0.027, 12-15 +0.029, IDSSE escondido +0.024; check_bar 130 paradas | **aceptada (actual)** |
 
 ## Trabajo de Xavi
 
