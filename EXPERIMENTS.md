@@ -774,3 +774,30 @@ SkillCorner integration: `validation/skillcorner.py`, its bench files, and the m
   granularity. SkillCorner's coarser labels taught coarser cuts (−6.7 possessions), and that
   lost under every fine ground truth.
 - This is the "how finely to cut" lesson again, from the training labels' side.
+
+### #17 weight of the learnt team evidence on v6 (`context.control.weight`, branch `exp/peso-control`)
+
+Pre-registered 13-nov 14:35, before measuring. Runs after #16 closes, against `josep/mejoras` as
+it is then.
+- **Change:** `context.control.weight` 1 -> 1.5 or 2.
+- **New reason:** the weight was swept on v1 (flat from 1 to 2.5, so 1). v6 is less confident
+  than the models it was swept with (|llr| > 2 on 75 % of bench frames with the ball vs 79 %).
+  Against a fixed hand-over cost of 16, its evidence may now count too little.
+- **Risk:** a larger weight means more hand-overs, i.e. finer cuts. The rule catches that through
+  the coarse condition.
+- **Rule (usual; corrected check for non-dead-ball changes):**
+  - sweep on the Metrica bench, seeds 0-3: mean spellF1 up under each of the 4 conditions,
+    >= 7/12 cells, macroF1 not down, game 3 not down; if both pass, the higher mean;
+  - the candidate needs the same on seeds 4-7;
+  - `check_control` (relative, as #15 (d));
+  - `check_bar`: 240-300 possessions, stoppages within ±2 of the current version, set pieces with
+    a stoppage not below it;
+  - doubtful: seeds 8-11.
+
+### #18 weight of the team-shape evidence in ball gaps (`context.shape.weight`, branch `exp/forma`)
+
+Pre-registered 13-nov 14:35, before measuring. Runs after #17.
+- **Change:** `context.shape.weight` 0.1 -> 0.05 or 0.2.
+- **Reason:** this constant was set by reasoning and never swept. Gaps hold the largest share of
+  team errors (21 % wrong vs 5.8 %), and this is the main team evidence inside them.
+- **Rule:** as #17.
