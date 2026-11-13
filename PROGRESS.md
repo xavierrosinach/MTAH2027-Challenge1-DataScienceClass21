@@ -66,7 +66,7 @@ oficiales. CSV actual: SHA256 `744deca5…`, 270 posesiones (media 14,0 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier, una a una: #21 hueco que es parada (`gap_restart`, `max_move_m` 5 / 10 / 15) | `exp/x21` | coordinador (`C:/MTAH2027/wt-x21`) | barrido en Metrica, semillas 0-3, en marcha. #22 descartada; #23 aceptada. Luego #24, #26 y #25 |
+| Ideas de Xavier: #27 hueco que es parada a 10 m, solo confirmación (semillas 8-11 y 12-15) | `exp/x27` | coordinador (`C:/MTAH2027/wt-x27`) | semillas 8-11 en marcha. #21 (15 m) descartada. Luego #24, #26 y #25 |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -146,6 +146,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | huecos | `descartado/huecos/red-huecos` | red también para los frames sin balón | mejor pérdida logarítmica en huecos, pero +0.0001 en el banco (dudoso dos veces) | descartada |
 | 13-nov | xavier | `descartado/xavier/parada-minima-3s` | parada mínima de 3 s (idea de Xavier) | +0.0045 (semillas 0-3), +0.0042 (4-7), 12/12 | descartada por su control: en BAR-ATH paradas 105 -> 100 y un saque de puerta sin parada |
 | 13-nov | xavier | `aceptado/xavier/saque-linea` | un golpeo de un balón pegado a la línea reanuda (idea de Xavier) | +0.0023 (semillas 0-3), +0.0032 (4-7), 12/12 en las dos rondas | **aceptada (actual)** |
+| 13-nov | xavier | `descartado/xavier/hueco-parada-15m` | hueco que es parada, radio 15 m (idea de Xavier) | 5 / 10 / 15 m: +0.013 / +0.027 / +0.032 (semillas 0-3, 12/12) | descartada: 136 paradas en BAR-ATH, tope 130. 10 m se confirma aparte (#27) |
 
 ## Trabajo de Xavi
 

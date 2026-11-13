@@ -106,6 +106,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/huecos/red-huecos` | 20 | network for the frames without the ball too (noise) |
 | `descartado/xavier/parada-minima-3s` | 22 | minimum stoppage 3 s (Xavier; BAR-ATH stoppages 105 -> 100) |
 | `aceptado/xavier/saque-linea` | 23 | a kick from a ball on the line restarts play (Xavier; current) |
+| `descartado/xavier/hueco-parada-15m` | 21 | a ball gap that is a stoppage, radius 15 m (Xavier; 136 stoppages on BAR-ATH > cap 130) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1115,3 +1116,11 @@ Pre-registered 13-nov, before any further measurement, as for #16.
   - `check_bar` with the dead-ball checks: 240-300 possessions; stoppages and set pieces with a
     stoppage not below the current version; dead share <= 50 %; stoppages <= 130.
 - **Outcomes:** all pass -> accepted; anything fails -> rejected (no doubtful round).
+
+*Codex on #21 and #27 (consulta-17):*
+- Rejecting 15 m follows the rule; the cap is not changed afterwards.
+- #27 is legitimate as a confirmation. The sweep only picked the candidate: #27 tests whether
+  10 m works, not that it is the best radius.
+- Limitation, recorded: with the ball missing on ~41 % of our frames, the rule can create false
+  stoppages that replace missed ones. The aggregate caps catch an excess, not errors that cancel
+  out.
