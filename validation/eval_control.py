@@ -84,7 +84,8 @@ def main():
     for (g, c), f in df.set_index(["game", "config"])["files"].items():
         print("  {} {}: {}".format(g, c, f))
     metr = df["game"].str.startswith("Sample_Game")
-    for label, m in (("Metrica", metr), ("IDSSE", ~metr)):
+    skc = df["game"].str.startswith("SKC_")
+    for label, m in (("Metrica", metr), ("IDSSE", ~metr & ~skc), ("SkillCorner", skc)):
         if m.any():
             print("\nmean over {} games:".format(label))
             print(df[m].groupby("config").mean(numeric_only=True).drop(columns=["frames"])

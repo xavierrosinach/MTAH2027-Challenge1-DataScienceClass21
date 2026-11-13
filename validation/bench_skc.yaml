@@ -1,0 +1,54 @@
+# Validation bench on the SkillCorner games only (python validation/bench.py --bench validation/bench_skc.yaml).
+# Not used to build the submission. Other matches, never BAR-ATH.
+# Data: SkillCorner open data (github.com/SkillCorner/opendata, commit 4340d27, MIT licence), A-League
+# 2024/25, broadcast tracking at 10 fps resampled to 25 fps (validation/skillcorner.py):
+#   python validation/skillcorner.py download    (-> ../external/skillcorner, never in the repo)
+# Ground truth (SkillCorner's algorithms, no human labels): D outside the phases of play; alive, the team
+# of the last possession group of the tracking (skillcorner_gt: group) or of the last player_possession
+# event (skillcorner_gt: events). Restarts for the tags from the dynamic events' game interruptions.
+# Games: the 10 of the 2025-10 release (the "10 matches" of SkillCorner's README). The 10 added on
+# 2026-09-08 are parsed too and can be added: SKC_1874553, SKC_1927964, SKC_1986691, SKC_1996436,
+# SKC_2006363, SKC_2007448, SKC_2007721, SKC_2010085, SKC_2016236; NOT SKC_1959846, whose phases of
+# play break up in open play (41 stoppages < 3 s, the other 19 games 0-5; skillcorner.py summary).
+# Degradation, tags and suite as validation/bench_dfl_dead.yaml (ball hidden while the ground truth
+# says dead). NOTE: this degradation was calibrated on clean tracking (Metrica); SkillCorner's ball is
+# already missing on part of the live frames and sits ~1.5 m from the nearest player, so the same
+# degradation makes it harder than BAR-ATH (python validation/calibrate.py --bench ... measures it).
+
+metrica_dir: ../external/metrica-sample-data
+skillcorner_dir: ../external/skillcorner
+skillcorner_gt: group
+games: [SKC_1886347, SKC_1899585, SKC_1925299, SKC_1953632, SKC_1996435, SKC_2006229, SKC_2011166,
+        SKC_2013725, SKC_2015213, SKC_2017461]
+
+tags: none
+synthetic_tags:             # SET PIECES stand-in from the restarts (validation/skillcorner.py)
+  lead_s: 4
+  recall: 0.8
+
+degrade:                    # as validation/bench_dfl_dead.yaml
+  hide_dead_ball: true
+  enabled: true
+  seeds: [0, 1, 2, 3]
+  noise_m: 0.0
+  players:
+    enabled: true
+    fragment_median_s: 35
+    gap_median_s: 1.0
+  ball_noise:
+    sigma_m: 1.2
+    corr_s: 1.0
+  ball_lost_early_s: 0.6
+  ball_live_gaps:
+    per_min: 0.5
+    median_s: 8.0
+
+gt:
+  min_spell_s: 0.0
+
+suite:
+  light: {tags: none, degrade: {ball_noise: {sigma_m: 0.6}, ball_lost_early_s: 0.0,
+                                ball_live_gaps: {per_min: 0.0}}}
+  degraded: {tags: none}
+  degraded+tags: {tags: events}
+  degraded+coarseGT: {tags: none, gt: {min_spell_s: 2.0}}

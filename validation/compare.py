@@ -22,15 +22,19 @@ KEY = ["condition", "game", "seed"]
 
 
 def short(game):
-    """Sample_Game_3 -> G3, IDSSE_J03WMX -> WMX."""
+    """Sample_Game_3 -> G3, IDSSE_J03WMX -> WMX, SKC_1886347 -> S1886347."""
     if game.startswith("Sample_Game_"):
         return "G" + game.rsplit("_", 1)[-1]
     if game.startswith("IDSSE_"):
         return game[-3:]
+    if game.startswith("SKC_"):
+        return "S" + game[4:]
     return game
 
 
 def source(game):
+    if game.startswith("SKC_"):
+        return "SkillCorner"
     return "IDSSE" if game.startswith("IDSSE_") else "Metrica"
 
 

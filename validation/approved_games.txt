@@ -9,3 +9,13 @@
 #   Josep: public download without registration and an explicit open licence). Loader:
 #   validation/idsse.py (only these 7 match ids exist).
 IDSSE_*
+#
+# SKC_* : the 20 A-League 2024/25 matches of SkillCorner open data, github.com/SkillCorner/opendata
+#   (pinned commit 4340d274572876239c154c90bc507a9b3250a656), licence MIT (the repository's LICENSE,
+#   "Copyright (c) 2020 SkillCorner"), public download without registration; the README asks users
+#   to credit SkillCorner. Broadcast tracking (computer vision on the TV feed, 10 fps), phases of
+#   play and dynamic events, all produced by SkillCorner's algorithms (no human annotation stated).
+#   Covered by the same general policy of Josep's decisions file (12-nov: public download without
+#   registration and an explicit open licence; MIT is listed). Loader:
+#   validation/skillcorner.py (only these 20 match ids exist).
+SKC_*

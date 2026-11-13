@@ -33,6 +33,7 @@ import degrade as deg  # noqa: E402
 import gt_events  # noqa: E402
 import idsse  # noqa: E402
 import metrica  # noqa: E402
+import skillcorner  # noqa: E402
 from possession.config import load_config  # noqa: E402
 
 TAG_COLUMNS = ["code", "start_frame", "end_frame", "team", "type", "half", "tags"]
@@ -47,7 +48,7 @@ PUBLISHED = {"baseline_raw": (0.6532, 0.0486), "baseline_smooth25": (0.6752, 0.1
 def load_bench(path):
     with open(path, encoding="utf-8") as handle:
         b = yaml.safe_load(handle)
-    for key in ("metrica_dir", "idsse_dir"):
+    for key in ("metrica_dir", "idsse_dir", "skillcorner_dir"):
         root = b.get(key)
         if root is not None:
             b[key] = root if os.path.isabs(root) else os.path.normpath(os.path.join(REPO, root))
@@ -56,13 +57,22 @@ def load_bench(path):
 
 def load_game(bench, game, cache_dir, min_spell_s=0.0):
     """(tracking, events, gt, blocks) of one bench game, from its source by name: IDSSE_<id>
-    (validation/idsse.py, ground truth = the tracking's BallStatus / BallPossession) or a Metrica
-    sample game (validation/metrica.py, ground truth derived from the events)."""
+    (validation/idsse.py, ground truth = the tracking's BallStatus / BallPossession), SKC_<id>
+    (validation/skillcorner.py, ground truth = phases of play + possession group, or player
+    possession events with `skillcorner_gt: events`) or a Metrica sample game
+    (validation/metrica.py, ground truth derived from the events)."""
     if idsse.is_idsse(game):
         root = bench["idsse_dir"]
         tr = idsse.load_tracking(root, game)
         events = idsse.load_events(root, game)
         gt, blocks = idsse.ground_truth(root, game, min_spell_s)
+        return tr, events, gt, blocks
+    if skillcorner.is_skc(game):
+        root = bench["skillcorner_dir"]
+        tr = skillcorner.load_tracking(root, game)
+        events = skillcorner.load_events(root, game)
+        gt, blocks = skillcorner.ground_truth(root, game, min_spell_s,
+                                              source=bench.get("skillcorner_gt"))
         return tr, events, gt, blocks
     tr = metrica.load_tracking(bench["metrica_dir"], game, cache_dir=cache_dir)
     events = metrica.load_events(bench["metrica_dir"], game)
