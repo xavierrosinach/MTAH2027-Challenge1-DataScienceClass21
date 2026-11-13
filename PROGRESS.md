@@ -38,7 +38,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #15 v9: v6 + 10 partidos SkillCorner (A-League, MIT, tracking de broadcast) | `exp/skillcorner` | coordinador; fase 1, worker Claude (`C:/MTAH2027/wt-skillcorner`) | fase 1 hecha (GT desde sus eventos de posesión, coherente pero grueso). Regla registrada; entrenando v9 con 20 partidos (1 proceso, sin copias de evaluación) |
+| #16 `gap_weight` 0.1, solo confirmación (semillas 8-11 y 12-15, que nunca se usaron con este valor) | `exp/gap01` | coordinador (`C:/MTAH2027/wt-gap01`) | semillas 8-11 en marcha |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -109,13 +109,14 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | huecos | `descartado/huecos/interp-50` | interpolar huecos del balón hasta 1-2 s | +0.0005; con semillas 8-11, −0.0004 | descartada: ruido |
 | 13-nov | muerto | `descartado/muerto/modelo-10-partidos` | modelo de balón muerto aprendido con 10 partidos, balón escondido en tiempo muerto | primer filtro: paradas en BAR-ATH 106 -> 82 | descartada; línea del muerto aprendido cerrada |
 | 13-nov | huecos | `descartado/huecos/gap-weight-03` | evidencia de equipo en los huecos (`gap_weight` 0.3, modelo de v6) | +0.0050 (semillas 0-3), +0.0044 (4-7), 11-12/12 celdas | descartada por su regla: check_bar con 105 paradas, menos de 106 (umbral corregido solo para lo siguiente) |
+| 13-nov | datos | `descartado/datos/v9-skillcorner` | modelo de control con 20 partidos (+10 SkillCorner) | −0.0063 (error típico 0.0015), 1/12 celdas, −6,7 posesiones | descartada: su GT grueso enseña a cortar más grueso |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
 | línea | probado | resultado | siguiente |
 |---|---|---|---|
 | Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #11 `train_mix` descartado (corta más fino); siguiente: evidencia mejor con el mismo corte (consulta 02-3, 01-3) |
-| Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | **v6 aceptado** (+0.013 en Metrica, +0.019 en 10 partidos): es la mayor ganancia desde v2 | `errors.py` sobre v6; SkillCorner (MIT) sin explorar |
+| Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | **v6 aceptado** (+0.013 en Metrica, +0.019 en 10 partidos); v9 con SkillCorner descartado (−0.006: su GT grueso enseña a cortar más grueso) | cerrada: no quedan datos abiertos con GT como el oficial y una granularidad parecida |
 | Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | #13 (aprendido con 10 partidos) también falla en BAR-ATH (106 -> 82 paradas): línea del muerto aprendido CERRADA. Solo transfiere el modelo ajustado en nuestro propio partido |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
@@ -159,7 +160,7 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
    - calibrar la resolución temporal del GT (02-2): ya lo cubre la condición coarseGT;
    - enmascarar rasgos del balón en el entrenamiento (02-5): el modelo de control solo se usa con
      el balón visto, y los huecos van por el modelo de forma.
-10. **(en curso, fase 1) SkillCorner opendata** (MIT, tracking de broadcast). Trae posesión por frame (algoritmo) y fases de juego. Primero hay que ver si trae etiquetas
+10. **(hecho, descartado) #15 SkillCorner:** su GT es más grueso y enseña a cortar más grueso.
     de posesión; solo si sobra tiempo.
 
 ## Incidencias de reglas
