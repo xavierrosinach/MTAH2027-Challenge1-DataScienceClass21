@@ -346,3 +346,64 @@ learnt model in charge, they were swept one by one on #6 (`sweep.py`, seeds 0-3,
 - The ball is visible on 85 % of possession time, so the information is there: what is missing
   is better evidence of *who controls* the ball (touch sequences, a learned model trained on these
   other games), not more tuning of the costs.
+
+## Open experiments: pre-registered before measuring
+
+Method since 13-nov (the coordinator decides): before measuring, the hypothesis, the single change
+and the acceptance rule are written here and committed. After measuring there are three outcomes:
+- everything passes: accepted;
+- something fails clearly: rejected;
+- doubtful (gain below one standard error, signs differ between conditions, or a secondary check
+  fails narrowly): one more round with seeds 8-11; if still doubtful, rejected.
+
+Thresholds are never changed after seeing a result. Each closed experiment gets a "What we learn"
+paragraph, and each accepted version gets `errors.py` to reorder the queue.
+
+### #10 v6: control model trained on 10 games (branch `exp/idsse`)
+
+- **Change:** `context.control.model` / `ensemble` -> `models/control_v6_mlp.json` /
+  `control_v6_lin.json`. Same features, network + linear, `weight_power` 0.25, trained on the
+  3 Metrica + 7 IDSSE games (`validation/bench_all.yaml`) with the relative attack direction.
+  Nothing else changes.
+- **Hypothesis:** more and more varied training data (a second provider) gives better log-odds on
+  an unseen provider. The IDSSE ground truth is built like the official one (ball status and
+  possession from the tracking).
+- **Rule:** first written 12-nov in PROGRESS.md ("Regla para la línea IDSSE"). The seeds 0-3
+  rounds were measured on v4 with `dead_weight` 0.5: Metrica +0.0094 (se 0.0022), 10 games
+  +0.0177 (se 0.0010).
+- **Rule restated 13-nov 11:50, before any result on the current base:**
+  - Reference: `josep/mejoras` 7c9e6c4 (v4 + `dead_weight` 0.3). Candidate: the same config with
+    the v6 models.
+  - The only measurement on this base is seeds 4-7, so the full conditions apply to it:
+    - (a) 10-game bench (Metrica + DFL, seeds 4-7): mean spellF1 up under each of the 4 conditions,
+      more than 20 of the 40 (condition, game) cells better, mean macroF1 not down;
+    - (b) Metrica bench alone (seeds 4-7): mean spellF1 up under each of the 4 conditions, at least
+      7 of the 12 cells better, mean macroF1 not down, game 3 (mean over its conditions) not down;
+    - (d) `check_control`: the model's behaviour on BAR-ATH relative to the bench as with v4.
+      Measured 13-nov: |llr| > 2 on 72.1 % of BAR-ATH frames with ball vs 75.2 % on the bench,
+      7.13 vs 7.16 sign flips per minute. It does not depend on `dead_weight`.
+    - (e) `check_bar` on the current base: 240-300 possessions; stoppages and the share of set
+      pieces with a stoppage not below the current version (106; 96.6 %).
+  - Doubtful (see above): seeds 8-11 on both benches.
+  - Before merging: Codex critiques the decision, and each objection is answered here.
+- **Threshold change on (d), recorded as required.** The 12-nov rule said "|llr| > 2 on 76-82 %
+  of BAR-ATH frames with ball", an absolute range taken from models trained on Metrica only. v6
+  gave 72.1 % on BAR-ATH and 75.2 % on the bench: it is less confident everywhere, and BAR-ATH
+  relative to the bench is the same as v4's (76 vs 79 %). Josep ruled on 13-nov, AFTER the
+  measurement (in his decisions file), that (d) is read relatively. This is a change made after
+  measuring. It applies to v6 by his decision, and to later models from now on.
+
+### #11 control model also trained on `light` copies (`context.control.train_mix`, branch `exp/mezcla`)
+
+- **Change:** the control models are trained on the usual degraded copies plus copies degraded as
+  the bench's `light` condition (seeds 100-101). Nothing else changes.
+- **Hypothesis:** the real tracking is not exactly our imitation of it. A model that has seen
+  two degradation strengths should transfer better (Codex, consulta-01, idea 4).
+- **Plan, depending on #10:**
+  - If #10 is accepted: the v7 models (trained on Metrica only) would be two changes against v6.
+    `train_mix [light]` is therefore retrained on the 10 games of v6 and measured against v6 with
+    the same (a), (b), (d), (e) as #10. First seeds 0-3; if that passes, seeds 4-7 on both benches.
+  - If #10 is rejected: v7 (trained on Metrica) against the current version with the usual rule:
+    Metrica bench seeds 0-3, all 4 conditions up, at least 7/12 cells, macroF1 not down, game 3
+    looked at; then seeds 4-7 with the same rule, `check_control` (relative) and `check_bar` as
+    in (e).
