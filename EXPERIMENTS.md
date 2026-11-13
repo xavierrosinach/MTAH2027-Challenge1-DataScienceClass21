@@ -111,6 +111,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/xavier/parada-minima-sobre-huecos` | 28 | minimum stoppage 3 s on top of #27 (a goal kick loses its stoppage) |
 | `descartado/xavier/saque-falso` | 24 | a kick that leaves the ball at rest within 6 s without a second player does not restart (Xavier; noise) |
 | `descartado/xavier/fantasma` | 26 | a player lost behind a rival kept as a ghost (Xavier; noise, not simulated by the bench) |
+| `descartado/xavier/balon-falso` | 25 | an isolated still ball while players run is not a stoppage, 1.5 m/s (Xavier; a goal kick loses its stoppage) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1254,3 +1255,46 @@ those.
   `descartado/xavier/fantasma`.
 - The bench cannot simulate occlusions (its degradation cuts tracks at random), so this idea
   cannot be validated here.
+
+**Result of #25 (13-nov), REJECTED: tag `descartado/xavier/balon-falso`.**
+- Sweep, seeds 0-3, with our values: 1.5 m/s +0.0010 (se 0.0002, 8/12), 2.0 m/s +0.0003 (7/12).
+  Candidate 1.5.
+- Seeds 4-7: +0.0005, the 4 conditions up, but 6/12 cells (88 % of runs unchanged): doubtful.
+- Seeds 8-11: +0.0005 (se 0.0001), the 4 up, 9/12. No run got worse in any round.
+- `check_bar`:
+  - stoppages 130 -> 125;
+  - **set pieces with a stoppage 96.6 -> 94.8 %**: the same goal kick as in #22 and #28;
+  - dead share 44.9 %.
+- Fails the check, so rejected.
+
+*Codex (consulta-22):*
+- The rejection is right.
+- The same goal kick failing under three changes is a real sensitivity, and also a fragile
+  check: the share hinges on one stoppage.
+- Keep the acceptance check on the global share. For later changes, report the share without
+  that goal kick as a diagnostic only.
+
+Noted: the acceptance rule does not change.
+
+**Xavier's ideas, summary:**
+- 2 accepted: #23 kick from the line, #27 gap stoppage at 10 m.
+- 6 rejected: #21 at 15 m, #22, #24, #25, #26, #28.
+
+His whole version measured +0.0326 on seeds 0-3 against the base before them. Ours, built from his
+two passing ideas, gained +0.0023 / +0.0032 (#23) and +0.027 / +0.029 (#27), each measured on its
+own base.
+
+*Error analysis of #27* (`errors.py`, Metrica, `degraded`, seeds 0-3; #16 in brackets):
+- spellF1 0.623 [0.594]. Perfect stoppages 0.649 [0.650]: only **+0.026** left in stoppages, from
+  +0.056. Perfect team 0.873 [0.859]: +0.25 left in the team.
+- Wrong team in gaps 18.8 % [19.7 %], with the ball seen 5.8 %.
+- True possessions found at IoU 0.5:
+
+  | < 2 s | 2-5 s | 5-10 s | 10-20 s | > 20 s |
+  |--:|--:|--:|--:|--:|
+  | 12.4 % | 49.4 % | 73.3 % | 84.5 % | 83.2 % |
+
+- Missed: 18.3 % to the rival, 16.5 % merged or wrong edges (from 20.4 %), 9.7 % called dead
+  (from 8.3 %).
+- **For the queue:** half the stoppage margin is taken. The team side, and short possessions in
+  particular, is where the rest is, and our features still do not see the < 2 s ones (−0.12).
