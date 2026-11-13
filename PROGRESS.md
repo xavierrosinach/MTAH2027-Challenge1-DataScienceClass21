@@ -192,7 +192,7 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
 
 ## Reproducibilidad (R5)
 
-- **13-nov, ~18:30.** Se comprobó en un worktree limpio de `josep/mejoras`, sin `cache/`, sin
+- **13-nov, ~17:30.** Se comprobó en un worktree limpio de `josep/mejoras`, sin `cache/`, sin
   `outputs/` y sin nada entrenado en local: `run.py --no-public` dio SHA256 `1077ece7…`, H 55377 /
   A 39316 / D 64164 / X 40462, igual que en el repo de trabajo. El CSV sale solo del código y de los
   modelos commiteados.
