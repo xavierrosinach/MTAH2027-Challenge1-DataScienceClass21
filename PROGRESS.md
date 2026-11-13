@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 04:00
+**Actualizado:** 2026-11-13 05:45
 
 **Calendario:**
 
@@ -34,7 +34,7 @@ oficiales. CSV actual: SHA256 `b122c3fc…`, 268 posesiones (media 14,1 s), 106 
 | línea | rama | agente | estado |
 |---|---|---|---|
 | Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 medido: cumple (a), (b) y (e); (c) parado por falta de memoria; (d) ver abajo. Herramientas IDSSE y sentido de ataque ya en `josep/mejoras` (638444d, mismo hash) |
-| Modelo de control entrenado también con copias `light` (`train_mix`, idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | desde 13-nov 05:00: entrenando v7 y después el banco |
+| Modelo de control entrenado también con copias `light` (`train_mix`, idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | v7 entrenado (pérdida en partido no visto 0.169 / 0.159 / 0.182, frente a 0.160 / 0.159 / 0.179 de v4); el banco lo paró la falta de memoria: espera a Josep |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -148,6 +148,16 @@ aprobación y ningún agente puede escribirlo.
   metrica-sports/sample-data, sin licencia explícita): aprobada para entrenar y validar, citando la
   fuente."
 - **Política de datos de otros partidos:** APROBADA el 12-nov. IDSSE (línea 1) la cumple.
+- **MEMORIA, todo parado (13-nov 05:40).** Claude Code mata los bancos que corren en segundo
+  plano cuando falta memoria (6,7 GB libres de 15,4) y no deja relanzarlos sin tu permiso. Esta
+  vez fue un solo banco de Metrica (v7, `train_mix`), con el entrenamiento ya hecho. Opciones:
+  - (a) me autorizas a relanzar los bancos con `--workers 2`: la mitad de memoria y el doble de
+    tiempo, ~20 min por banco;
+  - (b) arrancas Claude Code con `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1` (solo puedes
+    hacerlo tú);
+  - (c) cierras programas para liberar memoria.
+
+  Pendientes de banco: v7 (`exp/mezcla`) y v6 (`exp/idsse`).
 - **v6 (13-nov), dos decisiones tuyas:**
   1. ¿Relanzo las semillas 4-7 de v6 (condición c)? Claude Code las paró por falta de memoria y
      no deja relanzarlas sin tu permiso. Iría un banco cada vez: hay 8 GB libres de 15,4.
