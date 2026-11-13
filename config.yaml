@@ -144,7 +144,7 @@ context:
     team_switch: 16                    # cambiar de H a A o al revés (20 -> 16: banco de validación, EXPERIMENTS.md #2)
     to_dead: 10                        # pasar de juego vivo a D
     from_dead: 5                       # reanudar (D -> equipo)
-    min_dead_s: 1.0                    # un tramo D dura al menos 1 s
+    min_dead_s: 3.0                    # #28: un tramo D dura al menos 3 s
     restart_without_kick: 10           # coste extra de reanudar si se ve el balón y nadie lo golpea...
     kick_window_s: 0.5                 #   ...en +/- 0,5 s
 
