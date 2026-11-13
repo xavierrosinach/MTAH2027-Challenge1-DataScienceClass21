@@ -93,12 +93,13 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/semillas` | 8 | mean of 5 networks with different seeds (noise) |
 | `aceptado/muerto/dead-weight-03` | 9 | `dead_weight` 0.5 -> 0.3 |
 | `descartado/muerto/to-dead-20` | 9 | `to_dead` 10 -> 20 (fewer stoppages on BAR-ATH) |
-| `aceptado/datos/v6-idsse` | 10 | control model trained on 10 games, IDSSE added (current) |
+| `aceptado/datos/v6-idsse` | 10 | control model trained on 10 games, IDSSE added |
 | `descartado/control/train-mix-light` | 11 | also trained on `light` copies (cuts finer, loses coarseGT) |
 | `descartado/huecos/interp-50` | 12 | interpolate ball gaps up to 2 s (noise) |
 | `descartado/muerto/modelo-10-partidos` | 13 | learnt dead-ball model on 10 games, ball hidden in dead time (fewer stoppages on BAR-ATH) |
 | `descartado/huecos/gap-weight-03` | 14 | team evidence of the gap model, weight 0.3 (BAR-ATH stoppages 105 < 106) |
 | `descartado/datos/v9-skillcorner` | 15 | control model trained on 20 games, SkillCorner added (coarser cuts) |
+| `aceptado/huecos/gap-weight-01` | 16 | team evidence of the gap model, weight 0.1, confirmed on new seeds (current) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -118,8 +119,10 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 | 5 | #4 averaged with a non-linear model (`model_type: mlp`, `ensemble`) | 0.627 | 0.564 | 0.591 | 0.638 | 0.605 | 0.851 | ~251 | kept |
 | 6 | #5 trained with frames weighted by possession length^-0.25 (`weight_power`) | 0.640 | 0.573 | 0.599 | 0.640 | 0.613 | 0.852 | ~260 | kept |
 | 9 | #6 + `dead_weight` 0.5 -> 0.3 | 0.647 | 0.578 | 0.604 | 0.647 | 0.619 | 0.855 | ~260 | kept |
-| 10 | #9 with the control model trained on 10 games (3 Metrica + 7 IDSSE) | 0.656 | 0.590 | 0.617 | 0.653 | **0.629** | **0.856** | ~260 | **kept** |
+| 10 | #9 with the control model trained on 10 games (3 Metrica + 7 IDSSE) | 0.656 | 0.590 | 0.617 | 0.653 | 0.629 | 0.856 | ~260 | kept |
+| 16 | #10 + team evidence of the gap model (`gap_weight` 0.1) | 0.658 | 0.600 | 0.621 | 0.664 | **0.636** | **0.857** | ~261 | **kept** |
 
+Row 16 is on seeds 12-15, where #10 scores 0.634 / 0.857 (+0.0019; on seeds 8-11 +0.0011).
 Row 10 is on seeds 4-7, the only seeds measured on #9's base; #9 itself scores 0.616 / 0.854 on
 those seeds, so the paired gain is +0.013. Rows 0-9 are seeds 0-3.
 
@@ -801,3 +804,32 @@ Pre-registered 13-nov 14:35, before measuring. Runs after #17.
 - **Reason:** this constant was set by reasoning and never swept. Gaps hold the largest share of
   team errors (21 % wrong vs 5.8 %), and this is the main team evidence inside them.
 - **Rule:** as #17.
+
+**Result of #16 (13-nov), ACCEPTED: tag `aceptado/huecos/gap-weight-01`, `josep/mejoras` e54da9e.**
+- Seeds 8-11 vs v6 (0.6314): +0.0011 (se 0.0005, 58 % of runs better); light +0.0017, degraded
+  +0.0008, +tags +0.0009, coarseGT +0.0012; 7/12 cells; macroF1 +0.0008; game 3 +0.0002. Passes,
+  just.
+- Seeds 12-15 vs v6 (0.6336): +0.0019 (se 0.0004, 77 % better); +0.0006 / +0.0022 / +0.0027 /
+  +0.0021; 11/12 cells; macroF1 +0.0004; game 3 +0.0009. Passes.
+- `check_bar` (corrected threshold):
+  - possessions 268 -> 269;
+  - stoppages 106 -> 105 (within ±2);
+  - set pieces with a stoppage 96.6 % (unchanged);
+  - 0.5 % of frames changed.
+- CSV: SHA256 `1077ece7376fcf42aaa6027bbe324e8be286ca01c6d067e76fd0e2f0c028143c`, the same twice;
+  H 55,377 / A 39,316 / D 64,164 / X 40,462. `check_rules` PASS.
+
+*Codex's critique (consulta-09) and our answers:*
+1. *Legitimate, because the corrected threshold was written before measuring and applies to every
+   non-dead-ball change.* Yes: written after #14 and before any #16 measurement. Under the old
+   threshold it would have failed, like 0.3, and that is said here.
+2. *7/12 on seeds 8-11 is just the minimum; 12-15 counts as confirmation because it was fixed in
+   advance.* Yes, both rounds were registered together before either ran.
+3. *A small gain: do not present it as large.* Agreed: about +0.0015 on the bench. Its value is
+   that it is consistent: four seed sets, counting #14's 0.3 rounds, all positive.
+
+*What we learn (#16):*
+- With a gap model trained on two providers, the team evidence where the ball is missing is
+  worth using, a little.
+- Rules can be fixed honestly: when a check is mis-specified, apply it, record it, correct it
+  for what follows, and confirm on new data, without reopening what it rejected.
