@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 11:35
+**Actualizado:** 2026-11-13 14:30
 
 **Calendario:**
 
@@ -17,24 +17,28 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 
 | | banco spellF1 | banco macroF1 |
 |---|--:|--:|
-| **actual: v4 + `dead_weight` 0.3** (13-nov) | **0.619** | **0.855** |
+| **actual: v6 = modelo entrenado con 10 partidos (Metrica + IDSSE)** (13-nov) | **0.629** ¹ | **0.856** ¹ |
+| v4 + `dead_weight` 0.3 (13-nov) | 0.619 | 0.855 |
 | v4 (modelo de control aprendido + movimiento + red + peso por posesión) | 0.613 | 0.852 |
 | inicio del 12-nov (modelo de control v1) | 0.583 | 0.847 |
 | main de Xavier | 0.455 | 0.812 |
 | baseline oficial `baseline_smooth50` | 0.319 | 0.769 |
 
-Mejora: **+35 %** sobre main y **+92 %** sobre el baseline oficial.
+¹ Con semillas nuevas (4-7), en las que la versión anterior saca 0.616: ganancia emparejada
++0.013 (error típico 0.002). En el banco de 10 partidos (Metrica + IDSSE), +0.019.
+
+Mejora aproximada (las semillas no son las mismas): **+38 %** sobre main y **+97 %** sobre el
+baseline oficial (banco de Metrica).
 
 Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking degradado como el
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
-oficiales. CSV actual: SHA256 `b122c3fc…`, 268 posesiones (media 14,1 s), 106 paradas.
+oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 paradas.
 
 ## En curso
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 cumple (a), (b), (d) (Josep, lectura relativa) y (e). Ahora (c): semillas 4-7 encima de la versión actual, primero Metrica y luego DFL, de uno en uno |
-| Modelo de control entrenado también con copias `light` (`train_mix`, idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | v7 entrenado (pérdida en partido no visto 0.169 / 0.159 / 0.182, frente a 0.160 / 0.159 / 0.179 de v4); banco en cola, después de v6 |
+| #11 `train_mix [light]` (idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | v6 ha entrado, así que se reentrena `train_mix` con los 10 partidos y se mide contra v6 (EXPERIMENTS #11). Antes, `errors.py` sobre v6 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -93,20 +97,21 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 12-nov | control | `aceptado/control/v1-control-aprendido` | modelo aprendido de quién controla | 0.583 (+0.119) | aceptada |
 | 12-nov | control | `aceptado/control/v2-rasgos-movimiento` | rasgos de movimiento | 0.594 (+0.012) | aceptada |
 | 12-nov | control | `aceptado/control/v3-red-promediada` | promedio con red antisimétrica | 0.605 (+0.010) | aceptada |
-| 12-nov | control | `aceptado/control/v4-peso-posesion` | peso por duración de posesión | 0.613 (+0.008) | **aceptada (actual)** |
+| 12-nov | control | `aceptado/control/v4-peso-posesion` | peso por duración de posesión | 0.613 (+0.008) | aceptada |
 | 11/12-nov | todos | 13 etiquetas `descartado/...` | ver EXPERIMENTS.md | | descartadas |
 | 12-nov | control | `descartado/control/semillas` | promedio de 5 redes con semillas distintas | 0.614 (+0.001, error típico 0.001) | descartada: pierde en light y +tags (ruido) |
-| 13-nov | muerto | `aceptado/muerto/dead-weight-03` | peso del modelo de velocidad de balón muerto 0.5 -> 0.3 | 0.619 (+0.006; semillas 4-7 +0.009, 12/12) | **aceptada (actual)** |
+| 13-nov | muerto | `aceptado/muerto/dead-weight-03` | peso del modelo de velocidad de balón muerto 0.5 -> 0.3 | 0.619 (+0.006; semillas 4-7 +0.009, 12/12) | aceptada |
 | 13-nov | muerto | `descartado/muerto/to-dead-20` | coste de pasar a muerto 10 -> 20 | 0.616 (+0.003, 11/12) | descartada: en BAR-ATH las paradas bajan de 104 a 94 |
 | 13-nov | reglas | (barridos, sin etiqueta) | `pass_llr`, `kick_team_llr`, `from_dead` | ±0.002 | sin efecto (EXPERIMENTS #9) |
 | 13-nov | muerto | (barridos, sin etiqueta) | `dead_llr_clip`, `inside_llr`, `out_llr`, `isolated_llr`, `latch_llr`, `kick_llr` sobre la versión actual | ±0.001 | sin efecto; quitar `inside_llr` cuesta −0.020 (EXPERIMENTS #9) |
+| 13-nov | datos | `aceptado/datos/v6-idsse` | modelo de control entrenado con 10 partidos (3 Metrica + 7 IDSSE) | 0.629 en semillas 4-7 (+0.013, error típico 0.002); 10 partidos +0.019 (39/40 celdas) | **aceptada (actual)** |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
 | línea | probado | resultado | siguiente |
 |---|---|---|---|
-| Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #10 v6 (datos) y #11 `train_mix` en curso; luego, ideas de la consulta 02 |
-| Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | v6 cumple con semillas 0-3 | confirmar #10; SkillCorner (MIT) sin explorar |
+| Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #11 `train_mix` sobre v6; luego, ideas de la consulta 02 |
+| Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | **v6 aceptado** (+0.013 en Metrica, +0.019 en 10 partidos): es la mayor ganancia desde v2 | `errors.py` sobre v6; SkillCorner (MIT) sin explorar |
 | Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | margen del oráculo +0.06; falta un banco que imite nuestras paradas (el balón de IDSSE nunca falta) |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
@@ -118,7 +123,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
 (`C:/consultas-ia/consulta-NN-*.md`). Cada idea tiene una prueba o un motivo escrito.
 
-1. **(en curso) #10 v6:** modelo entrenado con 10 partidos (Metrica + IDSSE).
+1. **(hecho) #10 v6:** modelo entrenado con 10 partidos (Metrica + IDSSE). Aceptado el 13-nov.
 2. **(en curso) #11 `train_mix`:** entrenar también con copias `light` (Codex 01-4). Si da
    señal, ampliarlo a degradaciones variadas: tasa y duración de huecos, ruido y distancia
    balón-jugador por separado (Codex 02-1, +0.005 a +0.02 según Codex).

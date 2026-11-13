@@ -91,8 +91,9 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/rasgos-short` | 6 | half-second features on v4 |
 | `descartado/muerto/modelo-aprendido` | 7 | learnt dead-ball model, on (does not transfer) |
 | `descartado/control/semillas` | 8 | mean of 5 networks with different seeds (noise) |
-| `aceptado/muerto/dead-weight-03` | 9 | `dead_weight` 0.5 -> 0.3 (current) |
+| `aceptado/muerto/dead-weight-03` | 9 | `dead_weight` 0.5 -> 0.3 |
 | `descartado/muerto/to-dead-20` | 9 | `to_dead` 10 -> 20 (fewer stoppages on BAR-ATH) |
+| `aceptado/datos/v6-idsse` | 10 | control model trained on 10 games, IDSSE added (current) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -111,7 +112,11 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 | 4 | #3 + movement features (`features: [base, motion]`) | 0.615 | 0.555 | 0.579 | 0.629 | 0.594 | 0.849 | ~250 | kept |
 | 5 | #4 averaged with a non-linear model (`model_type: mlp`, `ensemble`) | 0.627 | 0.564 | 0.591 | 0.638 | 0.605 | 0.851 | ~251 | kept |
 | 6 | #5 trained with frames weighted by possession length^-0.25 (`weight_power`) | 0.640 | 0.573 | 0.599 | 0.640 | 0.613 | 0.852 | ~260 | kept |
-| 9 | #6 + `dead_weight` 0.5 -> 0.3 | 0.647 | 0.578 | 0.604 | 0.647 | **0.619** | **0.855** | ~260 | **kept** |
+| 9 | #6 + `dead_weight` 0.5 -> 0.3 | 0.647 | 0.578 | 0.604 | 0.647 | 0.619 | 0.855 | ~260 | kept |
+| 10 | #9 with the control model trained on 10 games (3 Metrica + 7 IDSSE) | 0.656 | 0.590 | 0.617 | 0.653 | **0.629** | **0.856** | ~260 | **kept** |
+
+Row 10 is on seeds 4-7, the only seeds measured on #9's base; #9 itself scores 0.616 / 0.854 on
+those seeds, so the paired gain is +0.013. Rows 0-9 are seeds 0-3.
 
 Entry 2: +0.009 spellF1, better under all 4 conditions (worst +0.003), 10/12 cells, games 1 and 3 up,
 game 2 flat (-0.003). The reference under-segments (215 predicted vs 384 true possessions); a
@@ -405,6 +410,67 @@ paragraph, and each accepted version gets `errors.py` to reorder the queue.
   relative to the bench is the same as v4's (76 vs 79 %). Josep ruled on 13-nov, AFTER the
   measurement (in his decisions file), that (d) is read relatively. This is a change made after
   measuring. It applies to v6 by his decision, and to later models from now on.
+
+**Result (13-nov), ACCEPTED: tag `aceptado/datos/v6-idsse`, `josep/mejoras` e652fd2.**
+
+| check | seeds 4-7 on #9's base | passes |
+|---|---|---|
+| (a) 10 games | +0.0190 (se 0.0010, 92 % of runs better); light +0.022, degraded +0.020, +tags +0.019, coarseGT +0.015; 39/40 cells; macroF1 +0.0037 | yes |
+| (b) Metrica | 0.6160 -> 0.6292, +0.0132 (se 0.0020, 81 % better); light +0.011, degraded +0.014, +tags +0.014, coarseGT +0.014; 11/12 cells (game 1 under light -0.0045); macroF1 +0.0024; game 3 +0.026, games 1 and 2 +0.007 | yes |
+| DFL alone | +0.0215 (se 0.0011), 28/28 cells, every game +0.015 to +0.028 | (part of a) |
+| (d) `check_control` | 72.1 vs 75.2 %, 7.13 vs 7.16 sign flips / min (relative reading, see above) | yes, by Josep's ruling |
+| (e) `check_bar` | 268 possessions (268), 106 stoppages (106), 96.6 % of set pieces with a stoppage (96.6 %), 1.4 % of frames changed | yes |
+
+CSV: SHA256 `c53b0b1baece1e93cf017ac49ebb51b37c93f4d9c406e44fe99b1a668e8b1a02`, the same twice;
+H 54,891 / A 39,856 / D 64,110 / X 40,462. `check_rules` PASS.
+
+**Codex's critique (consulta-03, `C:/consultas-ia/consulta-03-*.md`) and our answers:**
+1. *(d) was not met as written; moving it afterwards is post hoc.* True, and recorded above. The
+   exception was made by the team lead, not by the coordinator. What (d) is meant to catch
+   (behaviour on BAR-ATH unlike the bench) is not present: v6 is less confident on the bench too
+   (79 -> 75 %), by the same amount as on BAR-ATH.
+2. *Many correlated tests; fix a primary metric.* The primary metric is the mean paired difference
+   in spellF1 with its standard error. Conditions and cells are robustness filters, not counted
+   as independent evidence. +0.019 is 19 standard errors on 10 games, and +0.013 is 6.6 on Metrica
+   alone, on seeds not used in round 1.
+3. *The bench does not measure transfer to a new provider: on B, v6 saw the provider.* That is
+   why (b) requires the Metrica bench alone, where the comparison favours the reference: the
+   reference was trained on 2 games of the evaluated provider, v6 on the same 2 plus 7 of
+   another. v6 still wins there under all 4 conditions. The closest leave-provider-out we have
+   (12-nov, exploration): a model trained on the 7 IDSSE games only, never having seen Metrica,
+   scored +0.0027 over v4 on the Metrica bench. Another provider's data transfers at least as well
+   as two games of the same provider.
+4. *The gain could come from the GT or from the direction fix, not from data variety.*
+   - The direction fix leaves v4's bench runs and our CSV identical. It only fixes the IDSSE
+     training data, and the reference got it too in round 2.
+   - Data and its GT are one change by design: adding IDSSE means adding its labels. The decision
+     does not depend on splitting them.
+5. *Separate the effects; per-game persistence.* Per game, the gain holds in all 10:
+   - Metrica: +0.007 / +0.007 / +0.026;
+   - IDSSE: +0.015 to +0.028.
+
+   Labels of a third provider do not exist for us. The target's public window is forbidden for
+   decisions.
+6. *Errors by context and calibration before trusting it.* `errors.py` runs on every accepted
+   version, and runs next on this one. Shared systematic errors between IDSSE's GT and its own
+   evaluation can only inflate the DFL bench, which is why (b) is required.
+7. *Less confident means ambiguous frames near 0 may move edges.* On BAR-ATH, 1.4 % of frames
+   change and the number of possessions and stoppages is identical. On the bench, spellF1 rises
+   under the coarse GT too (+0.014 Metrica, +0.015 overall), so edges are not getting worse.
+8. *Accept as a candidate, not as validated for the target.* Agreed in spirit. `josep/mejoras`
+   is "the best version by our evidence". The submission is decided by the team on 16-nov, and
+   every earlier version is one tag away.
+
+*What we learn (#10):*
+- **Data was the bottleneck, as #8 suggested.** More games and a second provider gave more than
+  any feature or capacity change since v2. The largest gain was on the most different Metrica
+  game (+0.026).
+- A model trained on another provider's labels built from tracking (the official construction) did
+  not hurt on the event-labelled games.
+- Next in this line:
+  - re-run `errors.py` on v6;
+  - re-measure `train_mix` on the 10 games (#11);
+  - look for more open tracking data with possession labels (SkillCorner, MIT).
 
 ### #11 control model also trained on `light` copies (`context.control.train_mix`, branch `exp/mezcla`)
 
