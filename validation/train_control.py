@@ -36,7 +36,10 @@ EVAL_SEED = 0
 
 def game_data(job):
     """(names, X, y, seen, nearest_h) on the live frames of one degraded game."""
-    game, seed, bench, cfg_path = job
+    game, seed, bench, cfg_path = job[:4]
+    variant = job[4] if len(job) > 4 else None       # a suite condition (context.control.train_mix)
+    if variant:
+        bench = B._merge(bench, bench["suite"][variant])
     cfg = load_config(cfg_path)
     tr, _, gt, blocks = B.load_game(bench, game, cfg["paths"]["cache_dir"])
     tr = deg.degrade(tr, gt, bench["degrade"], seed)
@@ -52,7 +55,7 @@ def game_data(job):
     starts = np.concatenate(([0], change))
     lengths = np.diff(np.concatenate((starts, [len(gt)])))
     spell_s = np.repeat(lengths, lengths) / 25.0
-    return {"spell_s": spell_s[live],"game": game, "seed": seed, "names": names, "X": (g_h - g_a)[live],
+    return {"spell_s": spell_s[live],"game": game, "seed": seed, "variant": variant, "names": names, "X": (g_h - g_a)[live],
             "S": (g_h + g_a)[live].astype(np.float32),
             "y": (gt[live] == "H").astype(float), "seen": seen[live],
             "d_h": f["d_h"][live], "d_a": f["d_a"][live]}
@@ -98,6 +101,9 @@ def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, ar
     info = {"seeds": list(seeds), "l2": args.l2, "degrade": bench["degrade"]}
     if power:
         info["weight_power"] = power
+    mix = list(cfg["context"]["control"].get("train_mix") or [])
+    if mix:
+        info["mix"] = mix
     if mlp is not None:
         info["mlp"] = mlp
     logo_dir = B.logo_dir(cfg, out)
@@ -108,7 +114,8 @@ def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, ar
         if not args.no_save:
             control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
                          dict(info, games=[x for x in games if x != g]))
-        held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED][0]
+        held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED
+                and p["variant"] is None][0]
         rows.append(evaluate(models, held, cfg["context"]["ball"]["contact_m"]))
     with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
         print("\n{} ({}): held-out game (trained on the other games), live frames:".format(
@@ -146,6 +153,10 @@ def main():
     games = bench["games"]
     t0 = time.time()
     jobs = [(g, s, bench, args.config) for g in games for s in seeds + (EVAL_SEED,)]
+    mix = list(cfg["context"]["control"].get("train_mix") or [])
+    jobs += [(g, s, bench, args.config, v) for v in mix for g in games for s in seeds]
+    if mix:
+        print("training also on copies degraded as the suite conditions: {}".format(mix))
     with Pool(min(args.workers, len(jobs))) as pool:
         parts = pool.map(game_data, jobs)
     names = parts[0]["names"]

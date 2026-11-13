@@ -81,6 +81,7 @@ context:
     mlp: {hidden: 16, epochs: 4, l2: 0.001, lr: 0.002, batch: 2048, seed: 0}   # elegido por log-loss en partido no visto
     ensemble: [models/control_v6_lin.json]  # se promedia con un logit lineal (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
     weight_power: 0.25                 # entrenamiento: cada frame pesa (duración de su posesión)^-0.25 (EXPERIMENTS.md #6)
+    train_mix: []                      # entrenamiento: copias extra degradadas como estas condiciones del banco (p. ej. [light])
     replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
     weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
     gap_weight: 0.0                    # peso por frame sin balón (solo la forma de los equipos)
