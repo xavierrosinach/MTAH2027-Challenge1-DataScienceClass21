@@ -64,7 +64,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier, una a una: #22 parada mínima (`min_dead_s` 2 / 3) | `exp/x22` | coordinador (`C:/MTAH2027/wt-x22`) | barrido en Metrica, semillas 0-3, en marcha; luego #23, #21, #24, #26 y #25 |
+| Ideas de Xavier, una a una: #23 saque desde la línea (`kick_from_line`) | `exp/x23` | coordinador (`C:/MTAH2027/wt-x23`) | banco en Metrica, semillas 0-3, en marcha. #22 descartada. Luego #21, #24, #26 y #25 |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -142,6 +142,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | huecos | `descartado/huecos/forma` | peso de la forma en los huecos 0.05 / 0.2 | 0.2: +0.0010 dudoso; semillas 8-11 −0.0003 | descartada: ruido |
 | 13-nov | control | `descartado/control/red-32` | red de 32 neuronas con 10 partidos | pérdida logarítmica de la red 0.2132 frente a 0.2120 | descartada en la regla 1, sin banco |
 | 13-nov | huecos | `descartado/huecos/red-huecos` | red también para los frames sin balón | mejor pérdida logarítmica en huecos, pero +0.0001 en el banco (dudoso dos veces) | descartada |
+| 13-nov | xavier | `descartado/xavier/parada-minima-3s` | parada mínima de 3 s (idea de Xavier) | +0.0045 (semillas 0-3), +0.0042 (4-7), 12/12 | descartada por su control: en BAR-ATH paradas 105 -> 100 y un saque de puerta sin parada |
 
 ## Trabajo de Xavi
 

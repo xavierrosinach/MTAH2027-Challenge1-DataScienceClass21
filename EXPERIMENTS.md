@@ -104,6 +104,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/huecos/forma` | 18 | weight of the team-shape evidence in gaps 0.05 / 0.2 (noise) |
 | `descartado/control/red-32` | 19 | network of 32 hidden units on 10 games (held-out log-loss worse) |
 | `descartado/huecos/red-huecos` | 20 | network for the frames without the ball too (noise) |
+| `descartado/xavier/parada-minima-3s` | 22 | minimum stoppage 3 s (Xavier; BAR-ATH stoppages 105 -> 100) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1033,3 +1034,31 @@ share must stay <= 50 % and stoppages <= 130.
 - Why these caps: the tracking-derived ground truths we have give a dead share of 41-52 % per
   match (IDSSE) and 46 % (SkillCorner), and 92-113 stoppages per IDSSE match.
 - The current version has 40.4 % and 105.
+
+**Result of #22 (13-nov), REJECTED by its written check: tag `descartado/xavier/parada-minima-3s`.**
+- Sweep, seeds 0-3, vs `josep/mejoras`:
+  - 2 s: +0.0024 (se 0.0004), 12/12;
+  - 3 s: +0.0045 (se 0.0004), every condition >= +0.0038, 12/12, macroF1 +0.0003.
+
+  Candidate 3 s.
+- Seeds 4-7: +0.0042 (se 0.0008); light +0.0033, degraded +0.0044, +tags +0.0031, coarseGT
+  +0.0061; 12/12 cells; macroF1 +0.0003; −4.5 possessions per game.
+- `check_bar` (dead-ball change: stoppages and set pieces with a stoppage not below the current
+  version):
+  - **stoppages 105 -> 100**;
+  - **set pieces with a stoppage 96.6 -> 94.8 %** (one goal kick loses its stoppage);
+  - dead share 40.4 % (unchanged);
+  - possessions 269 -> 266.
+- Fails, and the check is deterministic, so new seeds cannot change it.
+
+*Codex (consulta-15):*
+- The rejection follows the rule.
+- Fewer stoppages is the change's purpose, but the lost goal kick looks like a real stoppage, so
+  treat it as a real failure; do not reinterpret the criterion.
+- Retrying it later on top of "a gap that is a stoppage" (#21), if that is accepted, would be
+  legitimate as a new, pre-registered hypothesis, with how stoppages and goal kicks are counted
+  fixed beforehand.
+
+*What we learn (#22):* the minimum stoppage length helps on the bench (fewer spurious 1-2 s
+stoppages). On our match it also removes a few short real ones, where the evidence detects the
+stoppage late.
