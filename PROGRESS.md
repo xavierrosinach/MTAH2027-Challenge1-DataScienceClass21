@@ -167,8 +167,11 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
    - enmascarar rasgos del balón en el entrenamiento (02-5): el modelo de control solo se usa con
      el balón visto, y los huecos van por el modelo de forma.
 10. **(hecho, descartado) #15 SkillCorner:** su GT es más grueso y enseña a cortar más grueso.
-    de posesión; solo si sobra tiempo.
-11. **Consulta 11 a Codex (13-nov):**    - #19, red de 32 neuronas: en curso;    - #20, red también para los huecos: registrado;    - suavizar el equipo a través de los huecos cortos: motivo para no probarlo, porque Viterbi ya      mantiene el estado a través de los huecos sin evidencia.
+11. **Consulta 11 a Codex (13-nov):**
+    - #19, red de 32 neuronas: en curso;
+    - #20, red también para los huecos: registrado;
+    - suavizar el equipo a través de los huecos cortos: motivo para no probarlo, porque Viterbi ya
+      mantiene el estado a través de los huecos sin evidencia.
 
 ## Incidencias de reglas
 
