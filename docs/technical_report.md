@@ -3,7 +3,7 @@
 More than a Hack 2027, Phase 1. Technical document of the submission `DataScienceClass21.csv`.
 
 > Living document: it describes the version on branch `josep/mejoras` (control model v6 trained on
-> 10 matches, dead-ball weight 0.3, gap evidence 0.1, kick from the line) and is updated with every accepted change. The full experiment
+> 10 matches, dead-ball weight 0.3, gap evidence 0.1, kick from the line, gap stoppages) and is updated with every accepted change. The full experiment
 > log is [EXPERIMENTS.md](../EXPERIMENTS.md).
 
 ## 1. Summary
@@ -58,6 +58,8 @@ missing, added +0.001 to +0.002 more (**0.636** on seeds 12-15, macroF1 0.857).
      (nobody within 6 m for 2 s).
    - After a ball out, dead until the next kick. A kick from a ball on the line that comes into
      the pitch (corners, throw-ins) also counts as the restart.
+   - A ball gap of at least 3 s after which the ball reappears within 10 m of where it went
+     missing is a stoppage (a free kick or offside is taken from the spot).
    - Goals: dead from the last ball near the goal to the `Kick Off (After Goal)` tag.
    - The second half is always dead before its kick-off at frame 113,742 (FAQ).
 3. **Team evidence, ball seen.**
@@ -332,7 +334,8 @@ downloaded beside our repository and never put in it. **We labelled nothing ours
 | + less weight on the speed model of dead ball (0.5 → 0.3) | 0.619 | 0.855 |
 | + control model trained on 10 matches, Metrica + IDSSE¹ | 0.629 | 0.856 |
 | + its gap model as weak evidence where the ball is missing² | 0.636 | 0.857 |
-| + a kick from the line restarts play (**current**)³ | **+0.002 / +0.003** | **+0.001** |
+| + a kick from the line restarts play³ | +0.002 / +0.003 | +0.001 |
+| + a long ball gap that ends near where the ball was lost is a stoppage (**current**)⁴ | **+0.027 / +0.029** | **+0.021 / +0.022** |
 
 ¹ Measured on new degradation seeds (4-7), where the previous version scores 0.616 / 0.854: a
 paired gain of +0.013 (standard error 0.002). Over the 10 matches (Metrica + IDSSE), +0.019
@@ -346,6 +349,13 @@ before measuring.
 ³ Paired gain over the previous version: +0.0023 on seeds 0-3 (0.6322 -> 0.6345, standard error
 0.0002) and +0.0032 on seeds 4-7 (standard error 0.0004), 12 of 12 cells in both rounds.
 
+⁴ A ball gap of at least 3 s after which the ball reappears within 10 m of where it was lost is
+dead-ball evidence. A free kick or offside is taken from the spot; in live play the ball
+reappears far away. Confirmed on seeds 8-11 (+0.0272, standard error 0.0021) and 12-15 (+0.0285,
+standard error 0.0020), 12 of 12 cells in both. On the IDSSE bench with the ball hidden in dead
+time it gave +0.024 in both spellF1 and macroF1, in all 7 matches. On our match it adds stoppages
+(106 → 130).
+
 Each accepted step improved all 4 conditions, and 7 to 12 of the 12 cells in every round it was
 measured on. The last ones gained 0.002–0.013 each, with paired standard errors of
 0.0004–0.0022. On a single full match, spellF1 noise is about ±0.04, which is why decisions use
@@ -353,14 +363,14 @@ paired comparisons over 48 bench runs.
 
 On our match, label-free aggregates of the current version:
 
-- 270 possessions with a mean of 14.0 s;
-- 40.3 % of graded frames dead, in 106 stoppages;
+- 281 possessions with a mean of 12.4 s;
+- 45.4 % of graded frames dead, in 130 stoppages (the real matches we have show 92-113);
 - 96.6 % of Smart Tagging set pieces have a predicted stoppage.
 
 The public 5 minutes are no longer looked at, not even as a smoke test (`run.py --no-public`). The last smoke test, of control model v4, gave spellF1 0.62 and macroF1 0.85 (17 possessions).
 
-Submission file: H 55,413 / A 39,412 / D 64,032 / X 40,462 frames. SHA256
-`744deca5ffb8e26678f0a08bc2bdd7aaf0feac685171885ea423257f0e32047a`.
+Submission file: H 52,362 / A 34,398 / D 72,097 / X 40,462 frames. SHA256
+`567f0d710f4d605f00489e474b068390edce119120b7bba29f8098b6f16f0aae`.
 
 ## 7. Limitations and what we would do next
 
