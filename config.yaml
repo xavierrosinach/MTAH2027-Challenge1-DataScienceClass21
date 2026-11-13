@@ -66,7 +66,7 @@ context:
   tag_weight: 0.03                     # evidencia por frame de las fases de ataque del Smart Tagging (solo sin balón)
 
   shape:                               # modelo de forma de los equipos (2.ª pasada, solo cuando no se ve el balón)
-    weight: 0.1                        # peso por frame (las variables son medias de 2 s: frames muy correlacionados)
+    weight: 0.2                        # #18: peso por frame de la forma (0.1 en josep/mejoras)
     clip: 3.0                          # límite de su evidencia por frame
     smooth_s: 2                        # media móvil de las variables de forma (s)
     own_m: 1.0                         # pseudo-etiquetas: el equipo etiquetado a < 1 m del balón visto...
