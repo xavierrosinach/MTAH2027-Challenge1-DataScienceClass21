@@ -559,3 +559,31 @@ Pre-registered 13-nov, before measuring.
   - `check_bar` (240-300 possessions; stoppages and set pieces with a stoppage not below the
     current 106 and 96.6 %).
   - Doubtful: seeds 8-11.
+
+### #13 learnt dead-ball model, retried on 10 games with our kind of stoppages (branch `exp/muerto-idsse`)
+
+Pre-registered 13-nov, before measuring.
+- **Change:** `context.dead_model` on, with `models/dead_v2.json`. Same model, features, weight
+  (0.5), clip and `train_mix [light]` as the rejected #7. Only the training data changes: the
+  10 games of `validation/bench_all_dead.yaml` (Metrica + IDSSE, ball hidden while dead) instead
+  of the 3 Metrica games. `train_dead.py` now loads any bench game through `bench.load_game`.
+- **New reason** to retry a rejected idea:
+  - #7 failed on BAR-ATH by calling play alive too readily (stoppages 104 -> 93), having learnt
+    stoppages from 3 games of one provider.
+  - IDSSE adds 7 games whose dead ball comes from the tracking's own ball status (the official
+    construction).
+  - The training copies now lose the ball in dead time, as ours does.
+- **Hypothesis:** a dead-ball model learnt on more, and more realistic, stoppages closes part of
+  the stoppage oracle gap (+0.057 on v6) and transfers to BAR-ATH.
+- **Rule**, checked in this order; the first clear failure rejects:
+  1. `check_bar` against the current version: 240-300 possessions, stoppages >= 106, share of
+     set pieces with a stoppage >= 96.6 %;
+  2. Metrica bench, seeds 0-3: mean spellF1 up under each of the 4 conditions, >= 7/12 cells,
+     macroF1 not down, game 3 not down;
+  3. IDSSE bench with the ball hidden in dead time (`bench_dfl_dead.yaml`), seeds 0-3: mean
+     spellF1 up under each of the 4 conditions, more than 14 of 28 cells, macroF1 not down;
+  4. Metrica bench, seeds 4-7: as in 2;
+  5. `check_dead`: the learnt model's sign flips per minute on BAR-ATH at most 1.2x the bench's
+     (#7: 3.6 vs 2.9, 1.24x).
+
+  Doubtful: seeds 8-11.
