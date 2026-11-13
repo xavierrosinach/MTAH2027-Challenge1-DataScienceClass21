@@ -105,8 +105,9 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/red-32` | 19 | network of 32 hidden units on 10 games (held-out log-loss worse) |
 | `descartado/huecos/red-huecos` | 20 | network for the frames without the ball too (noise) |
 | `descartado/xavier/parada-minima-3s` | 22 | minimum stoppage 3 s (Xavier; BAR-ATH stoppages 105 -> 100) |
-| `aceptado/xavier/saque-linea` | 23 | a kick from a ball on the line restarts play (Xavier; current) |
+| `aceptado/xavier/saque-linea` | 23 | a kick from a ball on the line restarts play (Xavier) |
 | `descartado/xavier/hueco-parada-15m` | 21 | a ball gap that is a stoppage, radius 15 m (Xavier; 136 stoppages on BAR-ATH > cap 130) |
+| `aceptado/xavier/hueco-parada-10m` | 27 | a ball gap that is a stoppage, radius 10 m, confirmed on new seeds (Xavier; current) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1160,3 +1161,42 @@ rescue:
   of the stoppages;
 - per-game results reported;
 - if either is down, #27 is not accepted.
+
+**Result of #27 (13-nov), ACCEPTED: tag `aceptado/xavier/hueco-parada-10m`, `josep/mejoras` 9ada683.**
+- Seeds 8-11: +0.0272 (se 0.0021, 100 % of runs better); light +0.039, degraded +0.029, +tags
+  +0.009, coarseGT +0.032; 12/12 cells; macroF1 +0.021; game 3 +0.021.
+- Seeds 12-15: +0.0285 (se 0.0020, 100 %); +0.040 / +0.029 / +0.013 / +0.031; 12/12; macroF1
+  +0.022; game 3 +0.025.
+- `check_bar`:
+  - possessions 270 -> 281;
+  - stoppages 106 -> 130 (at the cap);
+  - dead share 40.3 -> 45.4 %;
+  - set pieces with a stoppage 96.6 %;
+  - 5.1 % of frames changed.
+- Extra stricter check, added after Codex's critique (consulta-18) and registered before running
+  it: IDSSE bench with the ball hidden in dead time (tracking ground truth), seeds 0-3:
+  - spellF1 +0.0240 (se 0.0017) and macroF1 +0.0240 (se 0.0023), 100 % of runs better;
+  - 28/28 cells;
+  - every IDSSE game up (+0.017 to +0.041).
+- CSV: SHA256 `567f0d710f4d605f00489e474b068390edce119120b7bba29f8098b6f16f0aae`, the same twice;
+  H 52,362 / A 34,398 / D 72,097 / X 40,462. `check_rules` PASS.
+
+*Codex's critique (consulta-18) and our answers:*
+1. *At the cap, and the BAR-ATH check cannot tell real stoppages from tracking gaps in live play:
+   do not accept before validating on matches with tracking ground truth, looking at the quality
+   of the stoppages.* Done with the only such data we have: the stricter check above. On another
+   provider, with tracking-derived ground truth and our kind of gaps, both spellF1 and macroF1
+   (including the D class) rise in every game.
+2. *Keep #28 separate.* Yes: it is its own experiment, with its own registered rule.
+3. *Check per game, not only the mean.* Every cell (condition × game) improved, on Metrica (both
+   rounds) and on IDSSE.
+
+The remaining limitation is recorded: on our match, 130 stoppages is above the 92-113 of the
+real matches we have.
+
+*What we learn (#27):*
+- The largest single gain since the learnt control model comes from a dead-ball rule (a ball
+  that reappears near where it was lost after >= 3 s was stopped).
+- It fits the oracle analysis, where stoppages were worth +0.057.
+- It transfers to a second provider with tracking ground truth.
+- The idea came from a teammate; its radius was set by the bench and confirmed on new seeds.
