@@ -11,7 +11,7 @@ paths:
   output_dir: outputs                  # CSV, puntuaciones y vídeos
 
 ball_gaps:
-  interpolate_max_frames: 12           # rellena huecos del balón de hasta 12 frames (0,5 s) por interpolación lineal
+  interpolate_max_frames: 50           # DESCARTADO #12: rellenar hasta 2 s (12 = 0,5 s en josep/mejoras)
 
 context:
   second_half_kickoff_frame: 113742    # frame del saque del 2.º tiempo: lo evaluado antes es siempre D (FAQ)
