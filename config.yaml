@@ -83,7 +83,7 @@ context:
     weight_power: 0.25                 # entrenamiento: cada frame pesa (duración de su posesión)^-0.25 (EXPERIMENTS.md #6)
     replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
     weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
-    gap_weight: 0.0                    # peso por frame sin balón (solo la forma de los equipos)
+    gap_weight: 0.3                    # peso por frame sin balón: modelo de huecos de v6 (EXPERIMENTS.md #14)
     clip: 4.0                          # límite de su log-odds por frame
 
   passes:                              # toques, golpeos y pases completados
