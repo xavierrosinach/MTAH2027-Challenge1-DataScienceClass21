@@ -38,8 +38,8 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador (`C:/MTAH2027/wt-gap`) | barrido en Metrica, semillas 0-3, en marcha |
-| Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | fase 1 hecha (commit 2567a96): MIT; 20 partidos en el repo, 10 integrados. Muerto creíble (46 %); el GT de equipo de su tracking es ruidoso (coincide 83 % con sus eventos) y grueso (3,3 posesiones por minuto). Fase 2 (entrenar con 20 partidos, pico de 6-7 GB), por decidir después de #13 y #14 |
+| #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador (`C:/MTAH2027/wt-gap`) | semillas 0-3: 0.3 da +0.0050 (error típico 0.0008), 4/4 condiciones, 12/12 celdas y partido 3 +0.004; 0.1 da +0.0031. Candidato 0.3: faltan semillas 4-7 y check_bar, después del entrenamiento de v9 |
+| #15 v9: v6 + 10 partidos SkillCorner (A-League, MIT, tracking de broadcast) | `exp/skillcorner` | coordinador; fase 1, worker Claude (`C:/MTAH2027/wt-skillcorner`) | fase 1 hecha (GT desde sus eventos de posesión, coherente pero grueso). Regla registrada; entrenando v9 con 20 partidos (1 proceso, sin copias de evaluación) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
