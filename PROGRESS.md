@@ -41,7 +41,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #17 peso de la evidencia de equipo de v6 (`control.weight` 1.5 / 2) | `exp/peso-control` | coordinador (`C:/MTAH2027/wt-peso-control`) | barrido en Metrica, semillas 0-3, en marcha. Después, #18 (`shape.weight`) |
+| #18 peso de la forma de los equipos en los huecos (`shape.weight` 0.05 / 0.2) | `exp/forma` | coordinador (`C:/MTAH2027/wt-forma`) | barrido en Metrica, semillas 0-3, en marcha |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -114,6 +114,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | huecos | `descartado/huecos/gap-weight-03` | evidencia de equipo en los huecos (`gap_weight` 0.3, modelo de v6) | +0.0050 (semillas 0-3), +0.0044 (4-7), 11-12/12 celdas | descartada por su regla: check_bar con 105 paradas, menos de 106 (umbral corregido solo para lo siguiente) |
 | 13-nov | datos | `descartado/datos/v9-skillcorner` | modelo de control con 20 partidos (+10 SkillCorner) | −0.0063 (error típico 0.0015), 1/12 celdas, −6,7 posesiones | descartada: su GT grueso enseña a cortar más grueso |
 | 13-nov | huecos | `aceptado/huecos/gap-weight-01` | evidencia de equipo en los huecos, peso 0.1 (confirmación con semillas nuevas) | 8-11 +0.0011, 12-15 +0.0019; check_bar 105 paradas (umbral ±2) | **aceptada (actual)** |
+| 13-nov | control | `descartado/control/peso-v6` | peso de la evidencia de equipo 1.5 / 2 con v6 | +0.002 / +0.003, pero coarseGT −0.009 / −0.016 | descartada: corta más fino (5.º caso) |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 

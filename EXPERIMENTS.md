@@ -100,6 +100,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/huecos/gap-weight-03` | 14 | team evidence of the gap model, weight 0.3 (BAR-ATH stoppages 105 < 106) |
 | `descartado/datos/v9-skillcorner` | 15 | control model trained on 20 games, SkillCorner added (coarser cuts) |
 | `aceptado/huecos/gap-weight-01` | 16 | team evidence of the gap model, weight 0.1, confirmed on new seeds (current) |
+| `descartado/control/peso-v6` | 17 | weight of the learnt team evidence 1.5 / 2 on v6 (cuts finer) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -842,3 +843,27 @@ Pre-registered 13-nov 14:35, before measuring. Runs after #17.
 
 The gap evidence did what it was meant to do and nothing else. Short possessions stay out of
 reach.
+
+**Result of #17 (13-nov), REJECTED: tag `descartado/control/peso-v6`.** Sweep, seeds 0-3, vs v6 +
+`gap_weight` 0.1:
+
+| weight | mean | light | degraded | +tags | coarseGT | cells | macroF1 | possessions |
+|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 1.5 | +0.0019 (se 0.0014) | +0.0059 | +0.0066 | +0.0043 | **−0.0090** | 9/12 | −0.0001 | +14 |
+| 2.0 | +0.0033 (se 0.0019) | +0.0108 | +0.0102 | +0.0076 | **−0.0155** | 9/12 | −0.0002 | +23 |
+
+*Codex (consulta-10):*
+- No flaw in rejecting it: both values break the rule on coarseGT and macroF1.
+- The five cases show a systematic tension: finer cuts help with a fine ground truth and hurt
+  with a coarse one. That does not tell which one the real ground truth resembles, and we have no
+  label-free way to infer it.
+- Keep the current cut, unless independent evidence on how the real possessions are defined
+  appears (e.g. a labelling specification).
+
+Answer: agreed. CHALLENGE.md defines the ground truth as derived from the corrected tracking,
+without a minimum length, and that is all we have. The cut stays.
+
+*What we learn (#17):* every knob that adds hand-overs trades the fine ground truth against the
+coarse one. That makes five now: possession weighting, `team_switch`, `train_mix`, SkillCorner (in
+the other direction) and this weight. The current setting is the robust middle. The remaining
+gains must come from evidence that is right more often at the same cut, as v6 and #16 were.
