@@ -40,7 +40,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 |---|---|---|---|
 | #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador | regla registrada; barrido después del entrenamiento de #13 |
 | #13 modelo de balón muerto aprendido, reintentado con 10 partidos y el balón escondido en tiempo muerto | `exp/muerto-idsse` | coordinador (`C:/MTAH2027/wt-muerto-idsse`) | código y regla listos; entrena cuando acabe el banco de #12. Primer filtro: `check_bar` |
-| Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | desde 13-nov 16:50: licencia, descarga, cargador y agregados, sin procesos pesados |
+| Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | fase 1 hecha (commit 2567a96): MIT; 20 partidos en el repo, 10 integrados. Muerto creíble (46 %); el GT de equipo de su tracking es ruidoso (coincide 83 % con sus eventos) y grueso (3,3 posesiones por minuto). Fase 2 (entrenar con 20 partidos, pico de 6-7 GB), por decidir después de #13 y #14 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -192,6 +192,7 @@ aprobación y ningún agente puede escribirlo.
 - **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
+- **Bloqueos del guardián (worker SkillCorner, 13-nov), sin consecuencias:** un listado de procesos con la palabra "python" (falso positivo) y una lectura del registro de bloqueos con Bash (debía usar Read). No se vio nada.
 - **Falsos positivos del guardián (coordinador, 13-nov 17:20), sin consecuencias.** Dos comandos
   que editaban texto (un `sed` sobre el docstring del script de entrenamiento del modelo de
   balón muerto, y esta misma nota) contenían el nombre de ese script precedido de "python" y se
