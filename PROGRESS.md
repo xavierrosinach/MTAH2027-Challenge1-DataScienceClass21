@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-12 19:10
+**Actualizado:** 2026-11-13 03:00
 
 **Calendario:**
 
@@ -32,8 +32,8 @@ oficiales. CSV actual: SHA256 `00bf726c…`, 270 posesiones (media 14,0 s).
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | worker Claude (`C:\MTAH2027\wt-idsse`) | hecho: datos y v5all (ver la regla abajo). Ahora: corregir el sentido de ataque, reentrenar v6 y bancos |
-| Constantes de reglas revisadas con el modelo aprendido: pases, golpeos y costes de muerto | `exp/reglas` | worker Claude (`C:\MTAH2027\wt-reglas`) | desde 12-nov 19:05: diagnóstico con errors.py y barridos |
+| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 medido: cumple (a), (b) y (e); (c) parado por falta de memoria; (d) ver abajo. Herramientas IDSSE y sentido de ataque ya en `josep/mejoras` (638444d, mismo hash) |
+| Constantes de reglas revisadas con el modelo aprendido: pases, golpeos y costes de muerto | `exp/reglas` | coordinador (`C:\MTAH2027\wt-reglas`) | candidato `dead_weight` 0.3: banco y check_bar bien; corren las semillas 4-7. `to_dead` 20 suspende check_bar |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -62,6 +62,24 @@ cambia nada (hay que comprobar el mismo hash del CSV).
   v1-v4 (|llr| > 2 en el 76-82 % de los frames con balón; 6,4-7,7 cambios de signo por minuto).
 - (e) `check_bar`: entre 240 y 300 posesiones (v4: 270), y paradas y set pieces con parada sin
   bajar.
+
+**Resultado de v6 (13-nov, 02:00-03:00)**
+
+| condición | resultado | ¿cumple? |
+|---|---|---|
+| (a) banco de 10 partidos, semillas 0-3 | +0.0177 (error típico 0.0010, 90 % de ejecuciones mejores); light +0.019, degraded +0.017, +tags +0.018, coarseGT +0.017; 36/40 celdas; macroF1 +0.0037 | sí |
+| (b) banco de Metrica | +0.0094 (error típico 0.0022); las 4 condiciones suben (+0.008 a +0.011); 8/12 celdas; partido 3 +0.025, partido 1 +0.000, partido 2 +0.004 | sí (también pasa la regla de siempre) |
+| (c) semillas 4-7 | Claude Code paró los dos bancos por falta de memoria (los lancé a la vez y uno era DFL) | **pendiente** |
+| (d) `check_control` | BAR-ATH frente al banco: \|llr\| > 2 en el 72,1 % frente al 75,2 %; 7,13 frente a 7,16 cambios de signo por minuto | **no, tal como lo escribí** (72,1 < 76) |
+| (e) `check_bar` | 272 posesiones (v4: 270); 104 paradas; 96,6 % de set pieces con parada; cambia el 1,4 % de los frames | sí |
+
+Sobre (d): v6 es menos tajante que v4 en todas partes. En el banco baja del 79 % al 75 %, y en
+BAR-ATH algo parecido. La relación entre BAR-ATH y el banco, que es lo que pretende medir el
+control, es la misma que con v4. Pero el umbral que escribí antes de medir era absoluto y no se
+cumple. No lo cambio por mi cuenta: decide Josep (ver "Para Josep").
+
+Por el camino, con el sentido de ataque corregido, v4 sube en el banco DFL; antes se hundía en
+WR9. Así que la ganancia de v6 en DFL es +0.021, no +0.034.
 
 ## Experimentos cerrados
 
@@ -115,6 +133,13 @@ aprobación y ningún agente puede escribirlo.
   metrica-sports/sample-data, sin licencia explícita): aprobada para entrenar y validar, citando la
   fuente."
 - **Política de datos de otros partidos:** APROBADA el 12-nov. IDSSE (línea 1) la cumple.
+- **v6 (13-nov), dos decisiones tuyas:**
+  1. ¿Relanzo las semillas 4-7 de v6 (condición c)? Claude Code las paró por falta de memoria y
+     no deja relanzarlas sin tu permiso. Iría un banco cada vez: hay 8 GB libres de 15,4.
+  2. ¿Vale (d)? El umbral absoluto que escribí no se cumple (72,1 % < 76 %), pero la relación
+     con el banco es la misma que con v4. Si dices que no, v6 queda descartado.
+
+  Mientras tanto, `josep/mejoras` sigue siendo v4.
 - **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
