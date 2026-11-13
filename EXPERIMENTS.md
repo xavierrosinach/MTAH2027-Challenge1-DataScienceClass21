@@ -686,3 +686,45 @@ Pre-registered 13-nov, before measuring.
   - Doubtful: seeds 8-11.
 - Not measured on a SkillCorner bench: its ground truth is not the official construction and its
   tracking is harder than ours. It is training data only.
+
+**Result of #14 (13-nov), REJECTED by its written rule: tag `descartado/huecos/gap-weight-03`.**
+- Sweep, seeds 0-3, vs v6:
+  - 0.3: +0.0050 (se 0.0008); light +0.0017, degraded +0.0055, +tags +0.0069, coarseGT +0.0059;
+    12/12 cells; macroF1 +0.0014; game 3 +0.0041;
+  - 0.1: +0.0031 (se 0.0007), all 4 up, 11/12 cells.
+
+  Candidate 0.3.
+- Seeds 4-7 (0.3): +0.0044 (se 0.0008, 85 % of runs better); light +0.0023, degraded +0.0052,
+  +tags +0.0055, coarseGT +0.0044; 11/12 cells; macroF1 +0.0015; game 3 +0.0044.
+- `check_bar`:
+  - possessions 268 -> 269;
+  - **stoppages 106 -> 105** (the rule asked >= 106);
+  - set pieces with a stoppage 96.6 % -> 96.6 %, every type identical;
+  - dead share 40.4 -> 40.5 %;
+  - 0.7 % of frames changed.
+- A secondary check failing narrowly makes it doubtful. The only extra round allowed (seeds 8-11)
+  cannot change a deterministic check on BAR-ATH, so it stays doubtful and is rejected as the rule
+  says. Thresholds are not changed after the result.
+
+*Codex's critique (consulta-07) and our answers:*
+1. *Rejecting 0.3 is right; re-testing it under a new threshold would be changing the rule
+   afterwards.* Agreed. 0.3 is not reopened.
+2. *Testing 0.1 (seen in the sweep) under a corrected check would select it a posteriori; a new
+   rule does not erase what was seen.* Agreed. Only a confirmation on data never used for that
+   setting, with the earlier result explicitly not counted, would be legitimate (#16, if time
+   allows).
+3. *Apply the correction only to future changes.* Done:
+
+**Threshold correction, written 13-nov after #14 and applying from #15 on.** In `check_bar`, the
+rule "stoppages >= current" was written for dead-ball changes, which lost real stoppages
+(104-106 -> 82-94). For changes that do not touch the dead-ball evidence it becomes: stoppages
+within ±2 of the current version, and set pieces with a stoppage not below it. Dead-ball changes
+keep ">= current". This affects #15: its pre-registered (e) said ">= 106", and since the
+correction comes after #15 was registered, #15 keeps ">= 106".
+
+*What we learn (#14):*
+- The gap model trained on 10 games does carry team evidence: +0.004 to +0.005 on two seed
+  sets, 11-12/12 cells. On v3 (3 games) it was noise.
+- It moves one stoppage edge on BAR-ATH.
+- The gate was written for another kind of change. The lesson is about rules: a check that is
+  right for one family of changes can be too tight for another, so write it per family.
