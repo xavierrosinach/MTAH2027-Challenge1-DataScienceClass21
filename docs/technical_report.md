@@ -2,7 +2,7 @@
 
 More than a Hack 2027, Phase 1. Technical document of the submission `DataScienceClass21.csv`.
 
-> Living document: it describes the version on branch `josep/mejoras` (control model v4) and is
+> Living document: it describes the version on branch `josep/mejoras` (control model v4, dead-ball weight 0.3) and is
 > updated with every accepted change. The full experiment log is [EXPERIMENTS.md](../EXPERIMENTS.md).
 
 ## 1. Summary
@@ -20,7 +20,7 @@ of state. No label of the provided match was made or used by a person.
 Every design decision was taken on a **validation bench built from those other matches**, never on
 the public 5 minutes. On that bench (3 matches × 4 tracking-degradation seeds × 4 conditions) the
 mean spellF1 went from 0.319 (official `baseline_smooth50`), and from 0.455 for our first
-rule-based version, to **0.613**, with macroF1 0.852.
+rule-based version, to **0.619**, with macroF1 0.855.
 
 ## 2. Approach
 
@@ -44,7 +44,7 @@ rule-based version, to **0.613**, with macroF1 0.852.
    0.5 s. Goalkeeper slots get their team from the goal they defend, because the tracking
    sometimes swaps them.
 2. **Dead-ball evidence.**
-   - A logistic regression on the players' speed. It is fitted on the provided match itself with
+   - A logistic regression on the players' speed, weighted 0.3 per frame. It is fitted on the provided match itself with
      **rule-made pseudo-labels** (ball seen > 1 m out of the pitch or the first 3 s of a SET PIECES
      tag = dead; ball moving at a player's feet well inside the pitch = alive). No person decided
      any of these labels.
@@ -165,6 +165,10 @@ Tried and dropped, with the bench numbers in EXPERIMENTS.md:
 - **The network alone.** It lost on the most different bench game.
 - **Stronger possession weighting and cheaper hand-overs.** They win only with the fine ground
   truth.
+- **Averaging several networks trained with different seeds.** Within bench noise.
+- **Re-tuning the pass and kick evidence for the learnt model.** No effect.
+- **A dearer switch to dead ball (`to_dead` 10 → 20).** It won on the bench, but on our match it
+  gave fewer stoppages (104 → 94) and fewer set pieces with a stoppage (96.6 → 94.8 %).
 - **A dead-ball model learnt on the Metrica games.** It gave +0.017 on the bench but did not
   transfer to our match: fewer stoppages (104 → 93) and fewer Smart Tagging set pieces with a
   stoppage (96.6 → 91.4 %). The code is kept, switched off (`context.dead_model`).
@@ -233,7 +237,8 @@ self-supervised, with rule-made pseudo-labels (§2.2).
 | + learnt control model (linear) | 0.583 | 0.847 |
 | + movement features | 0.594 | 0.849 |
 | + averaged with the antisymmetric network | 0.605 | 0.851 |
-| + possession-length weighting (**current**) | **0.613** | **0.852** |
+| + possession-length weighting | 0.613 | 0.852 |
+| + less weight on the speed model of dead ball (0.5 → 0.3) (**current**) | **0.619** | **0.855** |
 
 Each accepted step improved all 4 conditions and 10 to 12 of the 12 cells. The last three gained
 0.008–0.012 each, with paired standard errors of 0.0013–0.0015. On a single full match, spellF1
@@ -241,14 +246,14 @@ noise is about ±0.04, which is why decisions use paired comparisons over 48 ben
 
 On our match, label-free aggregates of the current version:
 
-- 270 possessions with a mean of 14.0 s;
-- 40.6 % of graded frames dead, in 104 stoppages;
+- 268 possessions with a mean of 14.1 s;
+- 40.3 % of graded frames dead, in 106 stoppages;
 - 96.6 % of Smart Tagging set pieces have a predicted stoppage.
 
-On the public 5 minutes (smoke test only, 17 possessions): spellF1 0.62, macroF1 0.85.
+The public 5 minutes are no longer looked at, not even as a smoke test (`run.py --no-public`). The last smoke test, of control model v4, gave spellF1 0.62 and macroF1 0.85 (17 possessions).
 
-Submission file: H 55,204 / A 39,221 / D 64,432 / X 40,462 frames. SHA256
-`00bf726cd05e4387a4b1a118d51ada585db5c432ef8cb908fd4201c6e19636c7`.
+Submission file: H 54,482 / A 40,308 / D 64,067 / X 40,462 frames. SHA256
+`b122c3fc6eeb44acb9b9a3750fcff65987b0b9e0a7df5275cd4ec05b969711d2`.
 
 ## 7. Limitations and what we would do next
 

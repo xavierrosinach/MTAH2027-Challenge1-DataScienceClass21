@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 03:00
+**Actualizado:** 2026-11-13 04:00
 
 **Calendario:**
 
@@ -17,7 +17,8 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 
 | | banco spellF1 | banco macroF1 |
 |---|--:|--:|
-| **actual: v4** (modelo de control aprendido + movimiento + red + peso por posesión) | **0.613** | **0.852** |
+| **actual: v4 + `dead_weight` 0.3** (13-nov) | **0.619** | **0.855** |
+| v4 (modelo de control aprendido + movimiento + red + peso por posesión) | 0.613 | 0.852 |
 | inicio del 12-nov (modelo de control v1) | 0.583 | 0.847 |
 | main de Xavier | 0.455 | 0.812 |
 | baseline oficial `baseline_smooth50` | 0.319 | 0.769 |
@@ -26,14 +27,13 @@ Mejora: **+35 %** sobre main y **+92 %** sobre el baseline oficial.
 
 Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking degradado como el
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
-oficiales. CSV actual: SHA256 `00bf726c…`, 270 posesiones (media 14,0 s).
+oficiales. CSV actual: SHA256 `b122c3fc…`, 268 posesiones (media 14,1 s), 106 paradas.
 
 ## En curso
 
 | línea | rama | agente | estado |
 |---|---|---|---|
 | Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 medido: cumple (a), (b) y (e); (c) parado por falta de memoria; (d) ver abajo. Herramientas IDSSE y sentido de ataque ya en `josep/mejoras` (638444d, mismo hash) |
-| Constantes de reglas revisadas con el modelo aprendido: pases, golpeos y costes de muerto | `exp/reglas` | coordinador (`C:\MTAH2027\wt-reglas`) | candidato `dead_weight` 0.3: banco y check_bar bien; corren las semillas 4-7. `to_dead` 20 suspende check_bar |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -95,12 +95,16 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 12-nov | control | `aceptado/control/v4-peso-posesion` | peso por duración de posesión | 0.613 (+0.008) | **aceptada (actual)** |
 | 11/12-nov | todos | 13 etiquetas `descartado/...` | ver EXPERIMENTS.md | | descartadas |
 | 12-nov | control | `descartado/control/semillas` | promedio de 5 redes con semillas distintas | 0.614 (+0.001, error típico 0.001) | descartada: pierde en light y +tags (ruido) |
+| 13-nov | muerto | `aceptado/muerto/dead-weight-03` | peso del modelo de velocidad de balón muerto 0.5 -> 0.3 | 0.619 (+0.006; semillas 4-7 +0.009, 12/12) | **aceptada (actual)** |
+| 13-nov | muerto | `descartado/muerto/to-dead-20` | coste de pasar a muerto 10 -> 20 | 0.616 (+0.003, 11/12) | descartada: en BAR-ATH las paradas bajan de 104 a 94 |
+| 13-nov | reglas | (barridos, sin etiqueta) | `pass_llr`, `kick_team_llr`, `from_dead` | ±0.002 | sin efecto (EXPERIMENTS #9) |
 
 ## Cola de ideas (en orden)
 
 1. (en curso) Más partidos: IDSSE. Cumple la política general de Josep del 12-nov: descarga
    pública sin registro (figshare) y licencia CC BY 4.0, comprobadas en la API de figshare.
-2. (en curso) Constantes de reglas (pases, golpeos, costes de muerto) revisadas sobre v4.
+2. (hecho) Constantes de reglas: `dead_weight` 0.3 aceptado; el resto, sin efecto o sin
+   transferir.
 3. Modelo de secuencias de toques, para las posesiones de menos de 2 s.
 4. Smart Tagging como pista de equipo.
 5. Otros datasets abiertos para más adelante: SkillCorner opendata (licencia MIT, tracking de
@@ -139,7 +143,8 @@ aprobación y ningún agente puede escribirlo.
   2. ¿Vale (d)? El umbral absoluto que escribí no se cumple (72,1 % < 76 %), pero la relación
      con el banco es la misma que con v4. Si dices que no, v6 queda descartado.
 
-  Mientras tanto, `josep/mejoras` sigue siendo v4.
+  Mientras tanto, `josep/mejoras` es v4 + `dead_weight` 0.3. Si sigue adelante, v6 se vuelve a
+  medir encima (semillas 0-3 y 4-7, Metrica y DFL), un banco cada vez.
 - **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.

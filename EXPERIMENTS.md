@@ -80,7 +80,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `aceptado/control/v1-control-aprendido` | 3 | learnt control model (linear) |
 | `aceptado/control/v2-rasgos-movimiento` | 4 | movement features |
 | `aceptado/control/v3-red-promediada` | 5 | average with the antisymmetric network |
-| `aceptado/control/v4-peso-posesion` | 6 | possession-length weighting 0.25 (current) |
+| `aceptado/control/v4-peso-posesion` | 6 | possession-length weighting 0.25 |
 | `descartado/viterbi/team-switch-13`, `-20` | 6 | hand-over cost on v4 (coarseGT / worse) |
 | `descartado/cercania/contacto-1m` | rejected table | `contact_m` 1.0 |
 | `descartado/cercania/cercania-ademas` | 3 | keep nearest-player evidence as well |
@@ -91,6 +91,8 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/rasgos-short` | 6 | half-second features on v4 |
 | `descartado/muerto/modelo-aprendido` | 7 | learnt dead-ball model, on (does not transfer) |
 | `descartado/control/semillas` | 8 | mean of 5 networks with different seeds (noise) |
+| `aceptado/muerto/dead-weight-03` | 9 | `dead_weight` 0.5 -> 0.3 (current) |
+| `descartado/muerto/to-dead-20` | 9 | `to_dead` 10 -> 20 (fewer stoppages on BAR-ATH) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -108,7 +110,8 @@ Mean over 3 games x 4 seeds. spellF1 per condition; mean macroF1; predicted poss
 | 3 | #2 + learnt control model (`context.control`, weight 1) | 0.609 | 0.540 | 0.565 | 0.617 | 0.583 | 0.847 | ~244 | kept |
 | 4 | #3 + movement features (`features: [base, motion]`) | 0.615 | 0.555 | 0.579 | 0.629 | 0.594 | 0.849 | ~250 | kept |
 | 5 | #4 averaged with a non-linear model (`model_type: mlp`, `ensemble`) | 0.627 | 0.564 | 0.591 | 0.638 | 0.605 | 0.851 | ~251 | kept |
-| 6 | #5 trained with frames weighted by possession length^-0.25 (`weight_power`) | 0.640 | 0.573 | 0.599 | 0.640 | **0.613** | **0.852** | ~260 | **kept** |
+| 6 | #5 trained with frames weighted by possession length^-0.25 (`weight_power`) | 0.640 | 0.573 | 0.599 | 0.640 | 0.613 | 0.852 | ~260 | kept |
+| 9 | #6 + `dead_weight` 0.5 -> 0.3 | 0.647 | 0.578 | 0.604 | 0.647 | **0.619** | **0.855** | ~260 | **kept** |
 
 Entry 2: +0.009 spellF1, better under all 4 conditions (worst +0.003), 10/12 cells, games 1 and 3 up,
 game 2 flat (-0.003). The reference under-segments (215 predicted vs 384 true possessions); a
@@ -252,6 +255,34 @@ K=5 0.6138, +0.0010 (se 0.0010, 48 % of runs better; light -0.0013, degraded +0.
 coarseGT +0.0034; 9/12 cells; game 1 loses under 3 of 4 conditions); K=10 +0.0008 (se 0.0012, light
 -0.0019, +tags -0.0006, 7/12). Noise: the network's seed is not where the error is. With `[0]` the
 code retrains byte-identical v4 files.
+
+Entry 9 (branch `exp/reglas`, tag `aceptado/muerto/dead-weight-03`): **`dead_weight` 0.5 -> 0.3.**
+The rule-made constants were set when the team evidence was nearest-player proximity. With the
+learnt model in charge, they were swept one by one on #6 (`sweep.py`, seeds 0-3, mean spellF1 vs
+0.6128; cells better of 12):
+
+| parameter (now) | values: change in mean spellF1 (cells) | |
+|---|---|---|
+| `passes.pass_llr` (15) | 0: -0.0015 (4) · 8: -0.0001 (5) · 25: +0.0000 (5) | flat: no effect |
+| `passes.kick_team_llr` (10) | 0: -0.0010 (4) · 5: -0.0009 (4) · 15: +0.0014 (8, coarseGT -0.002) | noise |
+| `transition_cost.to_dead` (10) | 6: -0.0023 (0) · 14: +0.0022 (11) · 20: +0.0030 (11) · 30: +0.0042 (11) | see below |
+| `transition_cost.from_dead` (5) | 3: -0.0015 (1) · 8: +0.0019 (11) | small |
+| `dead_weight` (0.5) | 0: -0.0374 (0) · 0.1: +0.0042 (8, macro -0.0014) · 0.3: **+0.0060 (12, macro +0.0034)** · 0.8: -0.0082 (0) | kept 0.3 |
+
+- `dead_weight` 0.3 (the speed model of dead ball, fitted on each match with rule-made
+  pseudo-labels, gets less weight per frame): seeds 0-3 +0.0060, all 4 conditions (+0.004 to
+  +0.007), 12/12 cells for spellF1 and macroF1; **new seeds 4-7: +0.0088 (se 0.0008, 98 % of runs
+  better), all 4 conditions (+0.007 to +0.010), 12/12 cells, macroF1 +0.0038, game 3 +0.011.**
+  On BAR-ATH (`check_bar.py`, label-free): 268 possessions (270), 106 stoppages (104), dead share
+  40.3 % (40.6 %), 96.6 % of Smart Tagging set pieces with a stoppage (unchanged), 1.7 % of frames
+  changed. 0.1 to 0.3 is a plateau; 0.3 is better on macroF1.
+- `to_dead` 20 (and 20 together with `dead_weight` 0.3: +0.0072) passed the bench rule but **not
+  the BAR-ATH check**: stoppages 104 -> 94, set pieces with a stoppage 96.6 -> 94.8 % (a goal
+  kick lost). Same pattern as #7: a dearer stoppage costs real ones on our tracking. Tag
+  `descartado/muerto/to-dead-20`.
+- Error analysis of #6 (`errors.py`, `degraded`): spellF1 0.573; perfect stoppages 0.632, perfect
+  team 0.853. True possessions found at IoU 0.5: < 2 s 11 %, 2-5 s 42 %, 5-10 s 67 %, 10-20 s 78 %,
+  > 20 s 79 %. Missed: 20 % to the rival, 21 % merged or wrong edges, 8 % called dead.
 
 ### Error analysis of #3 (`validation/errors.py`, condition `degraded`)
 
