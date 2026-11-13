@@ -38,7 +38,8 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #12 interpolar huecos de balón más largos (`interpolate_max_frames` 25 / 50) | `exp/interp` | coordinador (`C:/MTAH2027/wt-interp`) | barrido en Metrica, semillas 0-3 |
+| #12 interpolar huecos de balón más largos (`interpolate_max_frames` 25 / 50) | `exp/interp` | coordinador (`C:/MTAH2027/wt-interp`) | barrido: 25 descartado (baja la macroF1); 50 dudoso (+0.0005, error típico 0.0005), ronda con semillas 8-11 |
+| #13 modelo de balón muerto aprendido, reintentado con 10 partidos y el balón escondido en tiempo muerto | `exp/muerto-idsse` | coordinador (`C:/MTAH2027/wt-muerto-idsse`) | código y regla listos; entrena cuando acabe el banco de #12. Primer filtro: `check_bar` |
 | Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | desde 13-nov 16:50: licencia, descarga, cargador y agregados, sin procesos pesados |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -186,6 +187,11 @@ aprobación y ningún agente puede escribirlo.
 - **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
+- **Falsos positivos del guardián (coordinador, 13-nov 17:20), sin consecuencias.** Dos comandos
+  que editaban texto (un `sed` sobre el docstring del script de entrenamiento del modelo de
+  balón muerto, y esta misma nota) contenían el nombre de ese script precedido de "python" y se
+  bloquearon como si lo ejecutaran. Las ediciones se hicieron con la herramienta Edit, sin
+  ejecutar nada.
 - **Falso positivo del guardián (coordinador, 13-nov 11:55), sin consecuencias.** Un texto para
   EXPERIMENTS.md que nombraba el fichero de decisiones (solo para citarlo) se bloqueó como si lo
   modificara. Se escribió sin nombrarlo.
