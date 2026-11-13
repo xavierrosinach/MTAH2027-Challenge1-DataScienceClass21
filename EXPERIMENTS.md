@@ -99,12 +99,13 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/muerto/modelo-10-partidos` | 13 | learnt dead-ball model on 10 games, ball hidden in dead time (fewer stoppages on BAR-ATH) |
 | `descartado/huecos/gap-weight-03` | 14 | team evidence of the gap model, weight 0.3 (BAR-ATH stoppages 105 < 106) |
 | `descartado/datos/v9-skillcorner` | 15 | control model trained on 20 games, SkillCorner added (coarser cuts) |
-| `aceptado/huecos/gap-weight-01` | 16 | team evidence of the gap model, weight 0.1, confirmed on new seeds (current) |
+| `aceptado/huecos/gap-weight-01` | 16 | team evidence of the gap model, weight 0.1, confirmed on new seeds |
 | `descartado/control/peso-v6` | 17 | weight of the learnt team evidence 1.5 / 2 on v6 (cuts finer) |
 | `descartado/huecos/forma` | 18 | weight of the team-shape evidence in gaps 0.05 / 0.2 (noise) |
 | `descartado/control/red-32` | 19 | network of 32 hidden units on 10 games (held-out log-loss worse) |
 | `descartado/huecos/red-huecos` | 20 | network for the frames without the ball too (noise) |
 | `descartado/xavier/parada-minima-3s` | 22 | minimum stoppage 3 s (Xavier; BAR-ATH stoppages 105 -> 100) |
+| `aceptado/xavier/saque-linea` | 23 | a kick from a ball on the line restarts play (Xavier; current) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1062,3 +1063,23 @@ share must stay <= 50 % and stoppages <= 130.
 *What we learn (#22):* the minimum stoppage length helps on the bench (fewer spurious 1-2 s
 stoppages). On our match it also removes a few short real ones, where the evidence detects the
 stoppage late.
+
+**Result of #23 (13-nov), ACCEPTED: tag `aceptado/xavier/saque-linea`, `josep/mejoras` 2d0999b.**
+- Seeds 0-3: +0.0023 (se 0.0002, 98 % of runs better); the 4 conditions +0.0017 to +0.0026;
+  12/12 cells; macroF1 +0.0008.
+- Seeds 4-7: +0.0032 (se 0.0004, 90 % better); +0.0022 to +0.0044; 12/12 cells; macroF1 +0.0009;
+  game 3 +0.0051.
+- `check_bar`: stoppages 105 -> 106; set pieces with a stoppage 96.6 % (unchanged; corners 12/12,
+  throw-ins 26/26); dead share 40.3 %; possessions 270; 0.1 % of frames changed.
+- CSV: SHA256 `744deca5ffb8e26678f0a08bc2bdd7aaf0feac685171885ea423257f0e32047a`, the same twice;
+  H 55,413 / A 39,412 / D 64,032 / X 40,462. `check_rules` PASS.
+
+*Codex (consulta-16):*
+- No flaw.
+- Risk: a corner or throw-in next to the line read as a restart while the ball is still out; an
+  aggregate check could hide it.
+- It suggests inspecting a few such sequences. We cannot (R1: no frame-level view of the match).
+  The label-free per-type check shows every corner and throw-in still has its stoppage.
+
+*What we learn (#23):* a small, specific rule that makes a restart visible pays on every seed and
+condition. It is the first of Xavier's ideas to pass, and the first dead-ball change since #9.
