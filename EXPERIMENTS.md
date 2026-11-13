@@ -860,8 +860,15 @@ reach.
 - Keep the current cut, unless independent evidence on how the real possessions are defined
   appears (e.g. a labelling specification).
 
-Answer: agreed. CHALLENGE.md defines the ground truth as derived from the corrected tracking,
-without a minimum length, and that is all we have. The cut stays.
+Answer: agreed. The only independent evidence is the text of the challenge (CHALLENGE.md, read
+13-nov):
+- The ground truth is derived mechanically from the corrected tracking, with nothing smoothed
+  afterwards.
+- A change needs *controlled* possession. The suggested proxies are "a player keeps the ball for
+  a few seconds" and "more than two consecutive passes".
+- Touches without control, deflections and aerial duels without control do not count.
+
+That leans against cutting finer than we do, and gives no rule to tune on. The cut stays.
 
 *What we learn (#17):* every knob that adds hand-overs trades the fine ground truth against the
 coarse one. That makes five now: possession weighting, `team_switch`, `train_mix`, SkillCorner (in
