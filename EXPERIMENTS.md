@@ -1013,3 +1013,23 @@ off in `config.yaml`, on in his `xavier/prova-xavier.yaml`).
 
 None of these appears in "Every path explored". #26 is a tracking fix the bench does not simulate
 (the degradation cuts tracks at random, not behind rivals). It is tested last, under the same rule.
+
+*Codex's critique of the list (consulta-14), answered before any of #21-#26 is measured:*
+1. *Ideas found by looking at the public window are exploratory even if values and decisions come
+   from the bench.* Agreed. That is why every candidate must be confirmed on seeds not used to
+   pick it (4-7). The bench games played no part in finding the ideas.
+2. *#25's threshold comes from our match's own statistics.* It is not used. Only values set here
+   (1.5 / 2.0) are tried, and #25 goes last, or is dropped if time runs out.
+3. *Measure one by one on the current version, then the cumulative set.* That is what happens: each
+   is measured on `josep/mejoras` as it is then, and accepted ones become the base for the next.
+4. *Account for the search among values.* The sweep picks a candidate; only the confirmation on
+   new seeds decides.
+5. *For rules that ADD stoppages, add a plausibility cap on our match, not only a floor.* Added
+   now, before measuring.
+6. *Order:* 22, 23, 21, 24, 26, 25. Adopted.
+
+**Extra check for changes that add dead time, written now:** on BAR-ATH (`check_bar`), the dead
+share must stay <= 50 % and stoppages <= 130.
+- Why these caps: the tracking-derived ground truths we have give a dead share of 41-52 % per
+  match (IDSSE) and 46 % (SkillCorner), and 92-113 stoppages per IDSSE match.
+- The current version has 40.4 % and 105.
