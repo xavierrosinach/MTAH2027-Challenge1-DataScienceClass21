@@ -101,6 +101,18 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | reglas | (barridos, sin etiqueta) | `pass_llr`, `kick_team_llr`, `from_dead` | ±0.002 | sin efecto (EXPERIMENTS #9) |
 | 13-nov | muerto | (barridos, sin etiqueta) | `dead_llr_clip`, `inside_llr`, `out_llr`, `isolated_llr`, `latch_llr`, `kick_llr` sobre la versión actual | ±0.001 | sin efecto; quitar `inside_llr` cuesta −0.020 (EXPERIMENTS #9) |
 
+## Mapa de líneas (lo probado, el resultado y lo siguiente)
+
+| línea | probado | resultado | siguiente |
+|---|---|---|---|
+| Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #10 v6 (datos) y #11 `train_mix` en curso; luego, ideas de la consulta 02 |
+| Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | v6 cumple con semillas 0-3 | confirmar #10; SkillCorner (MIT) sin explorar |
+| Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | margen del oráculo +0.06; falta un banco que imite nuestras paradas (el balón de IDSSE nunca falta) |
+| Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
+| Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
+| Huecos sin balón | modelo de control en huecos (`gap_weight`) | ruido | interpolar huecos más largos (`interpolate_max_frames`); consulta 02 |
+| Smart Tagging | evidencia débil de las fases de ataque en huecos (0.03) | sin medir en el banco (no hay sustituto de las fases) | motivo para no probarlo, o un sustituto desde eventos |
+
 ## Cola de ideas (en orden)
 
 1. (en curso) Más partidos: IDSSE. Cumple la política general de Josep del 12-nov: descarga
@@ -151,6 +163,9 @@ aprobación y ningún agente puede escribirlo.
 - **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
+- **Falso positivo del guardián (coordinador, 13-nov 11:55), sin consecuencias.** Un texto para
+  EXPERIMENTS.md que nombraba el fichero de decisiones (solo para citarlo) se bloqueó como si lo
+  modificara. Se escribió sin nombrarlo.
 - **Falsos positivos del guardián (worker IDSSE, 12-nov), sin consecuencias:**
   - llamar a Python a través de una variable de PowerShell (`& $py`): se usó la ruta explícita;
   - un mensaje de commit que nombraba el fichero de decisiones: el commit no lo tocaba y se

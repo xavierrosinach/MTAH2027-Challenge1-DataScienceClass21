@@ -256,6 +256,11 @@ coarseGT +0.0034; 9/12 cells; game 1 loses under 3 of 4 conditions); K=10 +0.000
 -0.0019, +tags -0.0006, 7/12). Noise: the network's seed is not where the error is. With `[0]` the
 code retrains byte-identical v4 files.
 
+*What we learn (#8):* the network's variance between seeds is small next to the bench noise.
+Lower held-out log-loss (−0.004) does not turn into spellF1. The remaining error is bias (what
+the features cannot see), not variance, so more capacity or averaging on the same features will
+not pay; new information will (features, data, labels).
+
 Entry 9 (branch `exp/reglas`, tag `aceptado/muerto/dead-weight-03`): **`dead_weight` 0.5 -> 0.3.**
 The rule-made constants were set when the team evidence was nearest-player proximity. With the
 learnt model in charge, they were swept one by one on #6 (`sweep.py`, seeds 0-3, mean spellF1 vs
@@ -291,6 +296,14 @@ learnt model in charge, they were swept one by one on #6 (`sweep.py`, seeds 0-3,
 
   All flat within noise: the rules are at a sensible point; only the "ball seen inside the pitch"
   evidence matters (removing it costs 0.02).
+- *What we learn (#9):*
+  - The only rule constant that mattered was the weight of the self-fitted speed model. It was
+    too strong once the learnt team model sharpened the hand-overs.
+  - Changes that make stoppages dearer win on the bench and lose real stoppages on BAR-ATH
+    (twice now: #7, `to_dead` 20). The bench imitates our stoppages badly, so any dead-ball change
+    needs `check_bar` before anything else.
+  - The pass and kick rules are now redundant with the learnt model (flat sweeps). They are
+    harmless, so they stay.
 - Error analysis of #6 (`errors.py`, `degraded`): spellF1 0.573; perfect stoppages 0.632, perfect
   team 0.853. True possessions found at IoU 0.5: < 2 s 11 %, 2-5 s 42 %, 5-10 s 67 %, 10-20 s 78 %,
   > 20 s 79 %. Missed: 20 % to the rival, 21 % merged or wrong edges, 8 % called dead.
