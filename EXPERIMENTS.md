@@ -97,6 +97,8 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/train-mix-light` | 11 | also trained on `light` copies (cuts finer, loses coarseGT) |
 | `descartado/huecos/interp-50` | 12 | interpolate ball gaps up to 2 s (noise) |
 | `descartado/muerto/modelo-10-partidos` | 13 | learnt dead-ball model on 10 games, ball hidden in dead time (fewer stoppages on BAR-ATH) |
+| `descartado/huecos/gap-weight-03` | 14 | team evidence of the gap model, weight 0.3 (BAR-ATH stoppages 105 < 106) |
+| `descartado/datos/v9-skillcorner` | 15 | control model trained on 20 games, SkillCorner added (coarser cuts) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -745,3 +747,30 @@ Pre-registered 13-nov, before any new measurement, as Codex advised in consulta-
   - `check_bar` with the corrected threshold for non-dead-ball changes: 240-300 possessions,
     stoppages within ±2 of the current version, set pieces with a stoppage not below it.
 - **Outcomes:** all pass -> accepted; anything fails -> rejected (no doubtful round).
+
+**Result of #15 (13-nov), REJECTED: tag `descartado/datos/v9-skillcorner`.** The tag keeps the
+SkillCorner integration: `validation/skillcorner.py`, its bench files, and the memory-only
+`train_control.py --no-heldout / --logo-games`.
+
+- Metrica bench, seeds 0-3, vs v6 (0.6292): 0.6229, **−0.0063** (se 0.0015, 27 % of runs better).
+  - By condition: light −0.0114, degraded −0.0073, +tags −0.0052, coarseGT −0.0011.
+  - 1/12 cells; macroF1 −0.0001; game 3 −0.0034.
+  - **−6.7 predicted possessions per game** (252 vs 259).
+- (b) fails clearly, so the 10-game bench was not run.
+
+*Codex's critique (consulta-08) and our answers:*
+1. *No flaw in rejecting it.* Agreed.
+2. *Besides the coarser ground truth, the input distribution differs:* 10 fps resampled, fewer
+   players seen, the ball farther from the players, camera and selection effects, and an
+   algorithmic ground truth that may share biases with its own signals. We cannot split these
+   with one bench. The fewer predicted possessions point at the ground truth's granularity first.
+3. *Keep it out of training; at most use it as a robustness check, without its possession
+   labels.* Agreed. It is not used: its ground truth is not the official construction, so it
+   would not validate anything either.
+
+*What we learn (#15):*
+- More data is not automatically better. The labels must be cut like the target's.
+- IDSSE helped because its ground truth is built like the official one, at a similar or finer
+  granularity. SkillCorner's coarser labels taught coarser cuts (−6.7 possessions), and that
+  lost under every fine ground truth.
+- This is the "how finely to cut" lesson again, from the training labels' side.
