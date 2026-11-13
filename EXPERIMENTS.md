@@ -1238,3 +1238,13 @@ those.
 - The rejection is coherent if the rounds were doubtful by the rule; they were, as shown above.
 - MacroF1 should not rescue it.
 - The change fires so rarely (75 % of runs unchanged) that the bench cannot measure it precisely.
+
+**#26 (occlusion), status 13-nov:**
+- Seeds 0-3: +0.0011 (se 0.0006); the 4 conditions +0.0007 to +0.0013; 9/12 cells; macroF1
+  +0.0003; game 3 +0.0006. Passes.
+- Seeds 4-7: −0.0006 (se 0.0005); light −0.0012, degraded −0.0008, +tags −0.0006, coarseGT +0.0004;
+  6/12 cells.
+- I first classed this as a clear failure. Codex (consulta-21) pointed out that a small negative
+  mean, within one standard error and with mixed signs, is inconclusive. That is exactly the
+  method's definition of doubtful (difference below one standard error, signs differ between
+  conditions). Correction: doubtful, so one round on seeds 8-11 decides.
