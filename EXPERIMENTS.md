@@ -102,6 +102,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `aceptado/huecos/gap-weight-01` | 16 | team evidence of the gap model, weight 0.1, confirmed on new seeds (current) |
 | `descartado/control/peso-v6` | 17 | weight of the learnt team evidence 1.5 / 2 on v6 (cuts finer) |
 | `descartado/huecos/forma` | 18 | weight of the team-shape evidence in gaps 0.05 / 0.2 (noise) |
+| `descartado/control/red-32` | 19 | network of 32 hidden units on 10 games (held-out log-loss worse) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -928,3 +929,34 @@ against `josep/mejoras` as it is then.
   1. Held-out log-loss on gap frames lower than the linear gap model's, same code. If not,
      rejected without a bench.
   2. As #19 2-6.
+
+**Result of #19 (13-nov), REJECTED at rule 1: tag `descartado/control/red-32`.**
+
+Held-out log-loss (`eval_control.py`, leave-one-game-out copies, frames with the ball):
+
+| | 32 hidden | 16 hidden (v6) |
+|---|--:|--:|
+| network, Metrica mean | 0.1688 | 0.1645 |
+| network, IDSSE mean | 0.2322 | 0.2324 |
+| network, 10-game weighted mean | 0.2132 | 0.2120 |
+| network + linear average, Metrica | 0.1691 | 0.1697 |
+| network + linear average, IDSSE | 0.2298 | 0.2328 |
+
+Rule 1 (the network's log-loss) fails, so no bench. Accuracy is the same (93.6 % on Metrica,
+90.1-90.2 % on IDSSE).
+
+*Codex (consulta-12):*
+- Rejecting it under the written rule is right.
+- The average improving shows the rule looked at the network alone, while the labeller uses the
+  average.
+- For the next experiments, the primary criterion should be the held-out log-loss of the full
+  average (network + linear), with the components kept as diagnostics.
+- Do not rescue this variant.
+
+**Correction, written 13-nov after #19, for experiments registered from now on:** a model-size or
+model-type change is screened on the held-out log-loss of the averaged log-odds the labeller uses,
+not on one member. #20 was registered before this correction and keeps its own rule 1.
+
+*What we learn (#19):* with 10 games, a network twice as large is not better on its own. The
+data can now support a little more capacity in the average, but not enough to show in the
+network. Capacity is not the bottleneck: the features are.
