@@ -66,7 +66,7 @@ oficiales. CSV actual: SHA256 `744deca5…`, 270 posesiones (media 14,0 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier: #27 hueco que es parada a 10 m, solo confirmación (semillas 8-11 y 12-15) | `exp/x27` | coordinador (`C:/MTAH2027/wt-x27`) | semillas 8-11 en marcha. #21 (15 m) descartada. Luego #24, #26 y #25 |
+| Ideas de Xavier: #27 hueco que es parada a 10 m, solo confirmación | `exp/x27` | coordinador (`C:/MTAH2027/wt-x27`) | pasa todo lo registrado (semillas 8-11 +0.027, 12-15 +0.029, 12/12; check_bar 130 paradas, en el tope). Por la crítica de Codex 18, falta un control extra más estricto, registrado antes de medirlo: banco IDSSE con el balón escondido en tiempo muerto (en marcha). Luego #28, #24, #26 y #25 |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
