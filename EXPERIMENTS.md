@@ -587,3 +587,37 @@ Pre-registered 13-nov, before measuring.
      (#7: 3.6 vs 2.9, 1.24x).
 
   Doubtful: seeds 8-11.
+
+**Result of #12 (13-nov), REJECTED: tag `descartado/huecos/interp-50`.**
+- Sweep, seeds 0-3, vs v6:
+  - 25 frames: +0.0005 (se 0.0004), but macroF1 −0.0002 (2 se) and coarseGT −0.0006: rejected;
+  - 50 frames: +0.0005 (se 0.0005), +tags 0.0000, coarseGT −0.0002: doubtful.
+- Extra round for 50, seeds 8-11: −0.0004 (se 0.0005), macroF1 −0.0007, 4/12 cells; only light
+  goes up (+0.0018).
+
+*Codex (consulta-05, part 1):* the rejection is justified. Caveat: it rejects this inference-time
+intervention, not the idea that more reliable ball observations help. Interpolated positions can
+be wrong, and the model was not retrained on them. Answer: agreed. We do not reopen it, because
+our tracking's gaps cannot be filled with real observations.
+
+*What we learn (#12):* the team model gets little from interpolated ball positions in longer
+gaps. Where the ball is missing for more than half a second, the line between two touches is not
+evidence of who controls it. The only condition that liked it, `light`, has the fewest and
+shortest gaps.
+
+### #14 team evidence in ball gaps from v6's gap model (`context.control.gap_weight`, branch `exp/gap`)
+
+Pre-registered 13-nov, before measuring.
+- **Change:** `context.control.gap_weight` 0 -> 0.1 or 0.3. The learnt control model has a
+  conditional logit for frames without the ball, trained with the rest of v6; today its output
+  is not used. Nothing is retrained.
+- **New reason** to retry: tried on v3 (+0.001 to +0.003, noise), when the gap model was trained
+  on 3 games of one provider. v6's is trained on 10 games of 2 providers, and Codex (consulta-05,
+  path 1) points at the gaps as the largest team error: 21 % wrong vs 5.8 % with the ball seen.
+- **Rule (the usual one):**
+  - A sweep, Metrica bench, seeds 0-3, values 0.1 and 0.3. A candidate has mean spellF1 up under
+    each of the 4 conditions, >= 7/12 cells, macroF1 not down and game 3 not down; if both pass,
+    the higher mean.
+  - The candidate needs the same on seeds 4-7, plus `check_bar` (240-300 possessions; stoppages
+    and set pieces with a stoppage not below 106 / 96.6 %).
+  - Doubtful: seeds 8-11.
