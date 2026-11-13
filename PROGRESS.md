@@ -38,7 +38,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #12 interpolar huecos de balón más largos (`interpolate_max_frames` 25 / 50) | `exp/interp` | coordinador (`C:/MTAH2027/wt-interp`) | barrido: 25 descartado (baja la macroF1); 50 dudoso (+0.0005, error típico 0.0005), ronda con semillas 8-11 |
+| #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador | regla registrada; barrido después del entrenamiento de #13 |
 | #13 modelo de balón muerto aprendido, reintentado con 10 partidos y el balón escondido en tiempo muerto | `exp/muerto-idsse` | coordinador (`C:/MTAH2027/wt-muerto-idsse`) | código y regla listos; entrena cuando acabe el banco de #12. Primer filtro: `check_bar` |
 | Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | desde 13-nov 16:50: licencia, descarga, cargador y agregados, sin procesos pesados |
 
@@ -108,6 +108,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | muerto | (barridos, sin etiqueta) | `dead_llr_clip`, `inside_llr`, `out_llr`, `isolated_llr`, `latch_llr`, `kick_llr` sobre la versión actual | ±0.001 | sin efecto; quitar `inside_llr` cuesta −0.020 (EXPERIMENTS #9) |
 | 13-nov | datos | `aceptado/datos/v6-idsse` | modelo de control entrenado con 10 partidos (3 Metrica + 7 IDSSE) | 0.629 en semillas 4-7 (+0.013, error típico 0.002); 10 partidos +0.019 (39/40 celdas) | **aceptada (actual)** |
 | 13-nov | control | `descartado/control/train-mix-light` | v6 entrenado también con copias `light` | +0.0027, pero coarseGT −0.0053 | descartada: corta más fino (+6 posesiones) |
+| 13-nov | huecos | `descartado/huecos/interp-50` | interpolar huecos del balón hasta 1-2 s | +0.0005; con semillas 8-11, −0.0004 | descartada: ruido |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
@@ -118,7 +119,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | oráculo +0.057 sobre v6; primero, el banco IDSSE con el balón escondido en tiempo muerto (cola 2b) |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
-| Huecos sin balón | modelo de control en huecos (`gap_weight`) | ruido | interpolar huecos más largos (`interpolate_max_frames`); consulta 02 |
+| Huecos sin balón | `gap_weight` (v3); interpolar 1-2 s (#12) | ruido; ruido | #14: `gap_weight` con el modelo de huecos de v6 (10 partidos) |
 | Smart Tagging | evidencia débil de las fases de ataque en huecos (0.03) | sin medir en el banco (no hay sustituto de las fases) | motivo para no probarlo, o un sustituto desde eventos |
 
 ## Cola de ideas (en orden)
@@ -136,8 +137,12 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
    BAR-ATH y en Metrica el balón casi nunca se ve con el juego parado; en IDSSE se ve siempre. Con
    esto, los cambios de balón muerto (oráculo +0.057 sobre v6) se podrían validar con dos
    proveedores. Sale de `errors.py` sobre v6.
-3. **Interpolar huecos de balón más largos** (`ball_gaps.interpolate_max_frames` 12 → 25 / 50).
-   Más frames con balón para el modelo, sin reentrenar. Es un barrido barato.
+3. **(hecho, descartado) #12 interpolar huecos más largos:** ruido; con semillas 8-11, −0.0004.
+3b. **(siguiente) #14 evidencia de equipo en los huecos con el modelo de huecos de v6**
+   (`gap_weight` 0.1 / 0.3; Codex 05, caminos 1 y 4). Barato, sin reentrenar.
+3c. **Entrenar con ocultaciones del balón realistas (Codex 05-2).** Motivo para no probarlo: la
+   degradación ya mete huecos con juego vivo (0,5 por minuto, unos 8 s), y el modelo de huecos de
+   v6 se entrena con ellos. #14 dirá si esa evidencia sirve.
 4. **Coste de cambio H↔A según la evidencia local de cambio** (Codex 02-3) o confianza según la
    calidad del tracking (Codex 01-3). Coste medio. El oráculo de cambios perfectos solo da ~+0.03,
    así que se espera poco.
