@@ -41,7 +41,6 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #20 red también para los frames sin balón (`gap_model_type: mlp`) | `exp/gap-red` | coordinador (`C:/MTAH2027/wt-gap-red`) | regla 1 superada: la red de huecos gana al lineal en los 10 partidos no vistos (Metrica 0.38-0.54 frente a 0.57-0.65). Banco de Metrica, semillas 0-3, en marcha |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -117,6 +116,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | control | `descartado/control/peso-v6` | peso de la evidencia de equipo 1.5 / 2 con v6 | +0.002 / +0.003, pero coarseGT −0.009 / −0.016 | descartada: corta más fino (5.º caso) |
 | 13-nov | huecos | `descartado/huecos/forma` | peso de la forma en los huecos 0.05 / 0.2 | 0.2: +0.0010 dudoso; semillas 8-11 −0.0003 | descartada: ruido |
 | 13-nov | control | `descartado/control/red-32` | red de 32 neuronas con 10 partidos | pérdida logarítmica de la red 0.2132 frente a 0.2120 | descartada en la regla 1, sin banco |
+| 13-nov | huecos | `descartado/huecos/red-huecos` | red también para los frames sin balón | mejor pérdida logarítmica en huecos, pero +0.0001 en el banco (dudoso dos veces) | descartada |
 
 ## Trabajo de Xavi
 

@@ -103,6 +103,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/control/peso-v6` | 17 | weight of the learnt team evidence 1.5 / 2 on v6 (cuts finer) |
 | `descartado/huecos/forma` | 18 | weight of the team-shape evidence in gaps 0.05 / 0.2 (noise) |
 | `descartado/control/red-32` | 19 | network of 32 hidden units on 10 games (held-out log-loss worse) |
+| `descartado/huecos/red-huecos` | 20 | network for the frames without the ball too (noise) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -960,3 +961,23 @@ not on one member. #20 was registered before this correction and keeps its own r
 *What we learn (#19):* with 10 games, a network twice as large is not better on its own. The
 data can now support a little more capacity in the average, but not enough to show in the
 network. Capacity is not the bottleneck: the features are.
+
+**Result of #20 (13-nov), REJECTED (doubtful twice): tag `descartado/huecos/red-huecos`.**
+- Rule 1 passed: held-out log-loss on gap frames, network vs linear, lower in all 10 games
+  (Metrica 0.376-0.543 vs 0.567-0.647; IDSSE 0.232-0.457 vs 0.316-0.556).
+- Metrica bench, seeds 0-3: +0.0001 (se 0.0003); light −0.0002, degraded −0.0001, +tags +0.0011,
+  coarseGT −0.0002; 7/12 cells. Doubtful.
+- Seeds 8-11: +0.0001 (se 0.0002); light −0.0005, degraded 0.0000, +tags +0.0009, coarseGT
+  −0.0001. Still doubtful, so rejected.
+
+*Codex (consulta-13):*
+- The rejection is reasonable.
+- "At weight 0.1 a better gap model does not change the decoder's decisions" is our reading, not
+  measured directly. It is recorded as a limitation; the change is not reopened.
+- Raising the gap weight with the new network would be a search after the fact; not done.
+- No model change with a reasonable expected gain fits in the time left. Spend it on
+  reproducibility and documentation. Agreed.
+
+*What we learn (#20):* a better component on held-out log-loss is not a better labeller when its
+evidence is a small share of the decision. Gains now need evidence that changes many hand-overs,
+and none of the remaining ideas offers that within the deadline.
