@@ -62,7 +62,7 @@ context:
     kick_llr: 2.0                      #   evidencia de vivo por frame del golpeo
     latch_llr: 1.5                     # tras salir el balón, sigue muerto hasta el siguiente golpeo (el saque)...
     latch_max_s: 60                    #   ...como máximo 60 s
-    kick_from_line: false              # true: también cuenta el golpeo de un balón pegado a la línea que entra al campo (córner, banda)
+    kick_from_line: true               # #23: también cuenta el golpeo de un balón pegado a la línea que entra al campo (córner, banda)
 
   # --- reglas nuevas (prova-xavier). Apagadas aquí: config.yaml sigue dando el CSV de josep/mejoras ---
   restart_check:                       # reanudar exige JUEGO: un jugador que mueve un balón parado no reanuda
