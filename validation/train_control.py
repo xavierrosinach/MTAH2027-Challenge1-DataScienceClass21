@@ -103,17 +103,19 @@ def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, ar
     logo_dir = B.logo_dir(cfg, out)
     os.makedirs(logo_dir, exist_ok=True)
     rows = []
-    for g in games:
+    for g in (args.logo_games or games):              # --logo-games: only the games a bench scores
         models = fit_models([p for p in train if p["game"] != g], args.l2, mlp, power)
         if not args.no_save:
             control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
                          dict(info, games=[x for x in games if x != g]))
-        held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED][0]
-        rows.append(evaluate(models, held, cfg["context"]["ball"]["contact_m"]))
-    with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
-        print("\n{} ({}): held-out game (trained on the other games), live frames:".format(
-            os.path.basename(out), "mlp" if mlp is not None else "logit"))
-        print(pd.DataFrame(rows).set_index("game").to_string())
+        held = [p for p in parts if p["game"] == g and p["seed"] == EVAL_SEED]
+        if held:                                      # none with --no-heldout
+            rows.append(evaluate(models, held[0], cfg["context"]["ball"]["contact_m"]))
+    if rows:
+        with pd.option_context("display.width", 200, "display.float_format", "{:.3f}".format):
+            print("\n{} ({}): held-out game (trained on the other games), live frames:".format(
+                os.path.basename(out), "mlp" if mlp is not None else "logit"))
+            print(pd.DataFrame(rows).set_index("game").to_string())
     if args.no_save:
         return None
     models = fit_models(train, args.l2, mlp, power)
@@ -136,6 +138,11 @@ def main():
                         help="override context.control.mlp settings (hidden=32 epochs=12 ...)")
     parser.add_argument("--out", default=None,
                         help="model file (default: context.control.model of the config)")
+    parser.add_argument("--no-heldout", action="store_true",
+                        help="skip the held-out copies (seed {}) and their scores: less memory, "
+                             "same model files".format(EVAL_SEED))
+    parser.add_argument("--logo-games", nargs="+", default=None,
+                        help="leave-one-game-out copies only for these games (default: all)")
     args = parser.parse_args()
     seeds = tuple(args.seeds)
     bench = B.load_bench(args.bench)
@@ -145,7 +152,8 @@ def main():
     print("features {} -> {}".format(list(control.feature_groups(cfg)), args.out))
     games = bench["games"]
     t0 = time.time()
-    jobs = [(g, s, bench, args.config) for g in games for s in seeds + (EVAL_SEED,)]
+    jobs = [(g, s, bench, args.config) for g in games
+            for s in seeds + (() if args.no_heldout else (EVAL_SEED,))]
     with Pool(min(args.workers, len(jobs))) as pool:
         parts = pool.map(game_data, jobs)
     names = parts[0]["names"]
