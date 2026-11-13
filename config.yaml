@@ -66,7 +66,7 @@ context:
 
   # --- reglas nuevas (prova-xavier). Apagadas aquí: config.yaml sigue dando el CSV de josep/mejoras ---
   restart_check:                       # reanudar exige JUEGO: un jugador que mueve un balón parado no reanuda
-    enabled: false                     #   (devolverlo al sitio, el portero que lo coloca para el saque de puerta)
+    enabled: true                      #   #24 (devolverlo al sitio, el portero que lo coloca para el saque de puerta)
     rest_speed: 1.0                    # el balón vuelve a estar parado: < 1 m/s...
     rest_s: 1.0                        #   ...durante 1 s
     max_s: 6                           # ...antes de 6 s desde el golpeo, sin que lo toque un segundo jugador
