@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 20:35
+**Actualizado:** 2026-11-13 22:15
 
 **Calendario:**
 
@@ -42,11 +42,14 @@ Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking de
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
 oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 paradas, 45,4 % muerto.
 
-## Resumen a 13-nov 17:40 (para la decisión del 16)
+## Resumen a 13-nov 22:15 (para la decisión del 16)
 
-- **Versión recomendada:** `josep/mejoras` e54da9e y siguientes (solo documentación después).
-  Es v6 + `gap_weight` 0.1, con el CSV `1077ece7…`, reproducible desde un worktree limpio.
-- **Lo que ha aportado cada paso** (banco de Metrica; la nota real puede ser otra):
+- **Versión recomendada:** `josep/mejoras` 9ada683 y siguientes (después, solo documentación).
+  - Es v6 + `gap_weight` 0.1 + dos reglas de Xavier: el saque desde la línea y el hueco que es
+    parada.
+  - CSV `567f0d71…`, reproducible desde un worktree limpio (comprobado a las 22:10).
+- **Lo que ha aportado cada paso** (banco de Metrica; cada uno medido sobre la versión anterior,
+  con semillas distintas; la nota real puede ser otra):
 
   | paso | banco |
   |---|---|
@@ -55,12 +58,18 @@ oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 
   | `dead_weight` 0.3 | 0.619 |
   | v6, 10 partidos | 0.629 (semillas 4-7) |
   | huecos | 0.636 (semillas 12-15) |
+  | saque desde la línea | +0.002 / +0.003 |
+  | hueco que es parada | +0.027 / +0.029 (y +0.024 en IDSSE) |
 
-- **Experimentos del 12 y 13 de noviembre:** 13 cerrados con su regla escrita antes de medir
-  (#8-#20). 4 aceptados (#9, #10, #16 y la herramienta IDSSE) y el resto descartados con
-  etiqueta. Codex criticó cada cierre.
+  La versión actual da 0.623 en la condición degradada, semillas 0-3 (`errors.py`).
+- **Experimentos del 12 y 13 de noviembre:** 21 cerrados con su regla escrita antes de medir
+  (#8-#28). 6 aceptados (#9, #10, #16, #23, #27 y la herramienta IDSSE) y el resto descartados
+  con etiqueta. Codex criticó cada cierre.
+- **En nuestro partido** (sin etiquetas): 281 posesiones, 130 paradas y 45,4 % de tiempo muerto.
+  Hay más paradas que en los partidos reales que tenemos (92-113), pero están dentro del tope
+  fijado antes de medir.
 - **Cola:** no queda ningún cambio de modelo con ganancia esperada razonable que se pueda validar
-  antes de la congelación (Codex 13 está de acuerdo). Cada idea tiene su prueba o su motivo escrito.
+  antes de la congelación (consultas 13 y 23). Cada idea tiene su prueba o su motivo escrito.
 - **Hasta la congelación** (14-nov 20:00):
   - vigilar el trabajo de Xavi y medirlo en el banco si lo sube;
   - mantener la documentación al día.
@@ -255,6 +264,8 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
 
 ## Reproducibilidad (R5)
 
+- **13-nov, ~22:10, versión con #27.** En un worktree limpio, `run.py --no-public` dio SHA256
+  `567f0d71…`, H 52362 / A 34398 / D 72097 / X 40462, igual que en el repo de trabajo.
 - **13-nov, ~17:30.** Se comprobó en un worktree limpio de `josep/mejoras`, sin `cache/`, sin
   `outputs/` y sin nada entrenado en local: `run.py --no-public` dio SHA256 `1077ece7…`, H 55377 /
   A 39316 / D 64164 / X 40462, igual que en el repo de trabajo. El CSV sale solo del código y de los
