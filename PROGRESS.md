@@ -69,7 +69,7 @@ oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier: #24 saque falso (`restart_check`) | `exp/x24` | coordinador (`C:/MTAH2027/wt-x24`) | banco en Metrica, semillas 0-3, en marcha. #28 descartada. Luego #26 y #25 |
+| Ideas de Xavier: #26 jugador tapado (`occlusion`) | `exp/x26` | coordinador (`C:/MTAH2027/wt-x26`) | banco en Metrica, semillas 0-3, en marcha. #24 descartada. Luego #25 |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -152,6 +152,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | xavier | `descartado/xavier/hueco-parada-15m` | hueco que es parada, radio 15 m (idea de Xavier) | 5 / 10 / 15 m: +0.013 / +0.027 / +0.032 (semillas 0-3, 12/12) | descartada: 136 paradas en BAR-ATH, tope 130. 10 m se confirma aparte (#27) |
 | 13-nov | xavier | `aceptado/xavier/hueco-parada-10m` | hueco que es parada, radio 10 m (idea de Xavier, confirmación) | semillas 8-11 +0.027, 12-15 +0.029, IDSSE escondido +0.024; check_bar 130 paradas | **aceptada (actual)** |
 | 13-nov | xavier | `descartado/xavier/parada-minima-sobre-huecos` | parada mínima de 3 s encima de #27 | +0.0057 (semillas 8-11, 12/12) | descartada: el mismo saque de puerta pierde su parada (96,6 -> 94,8 %) |
+| 13-nov | xavier | `descartado/xavier/saque-falso` | saque falso (idea de Xavier) | +0.0005 / +0.0002 / −0.0000 (semillas 0-3, 4-7 y 8-11) | descartada: dudosa dos veces, casi nunca se activa |
 
 ## Trabajo de Xavi
 

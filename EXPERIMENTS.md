@@ -109,6 +109,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/xavier/hueco-parada-15m` | 21 | a ball gap that is a stoppage, radius 15 m (Xavier; 136 stoppages on BAR-ATH > cap 130) |
 | `aceptado/xavier/hueco-parada-10m` | 27 | a ball gap that is a stoppage, radius 10 m, confirmed on new seeds (Xavier; current) |
 | `descartado/xavier/parada-minima-sobre-huecos` | 28 | minimum stoppage 3 s on top of #27 (a goal kick loses its stoppage) |
+| `descartado/xavier/saque-falso` | 24 | a kick that leaves the ball at rest within 6 s without a second player does not restart (Xavier; noise) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1224,3 +1225,16 @@ real matches we have.
 *What we learn (#22 and #28):* our match has at least one real stoppage shorter than 3 s, as our
 labeller sees it (a goal kick; we detect its stoppage late). A minimum length costs exactly
 those.
+
+**Result of #24 (13-nov), REJECTED (doubtful twice): tag `descartado/xavier/saque-falso`.**
+- Seeds 0-3: +0.0005 (se 0.0002); the 4 conditions +0.0004 / +0.0005; 8/12 cells; macroF1
+  +0.0010; game 3 +0.0000. Passes. 75 % of runs are unchanged.
+- Seeds 4-7: +0.0002 (se 0.0001); coarseGT −0.0001. Signs differ between conditions: doubtful.
+- Seeds 8-11: −0.0000 (se 0.0002); degraded −0.0002, coarseGT −0.0002, +tags 0.0000, light +0.0004.
+  Below one standard error and signs differ: still doubtful, so rejected.
+- MacroF1 rose slightly in every round (+0.0006 to +0.0010), but spellF1 is the primary metric.
+
+*Codex (consulta-20):*
+- The rejection is coherent if the rounds were doubtful by the rule; they were, as shown above.
+- MacroF1 should not rescue it.
+- The change fires so rarely (75 % of runs unchanged) that the bench cannot measure it precisely.
