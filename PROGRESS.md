@@ -38,6 +38,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
+| #12 interpolar huecos de balón más largos (`interpolate_max_frames` 25 / 50) | `exp/interp` | coordinador (`C:/MTAH2027/wt-interp`) | barrido en Metrica, semillas 0-3 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
