@@ -33,6 +33,7 @@ oficiales. CSV actual: SHA256 `b122c3fc…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
+| Balón muerto, 2.ª ronda: barridos de `dead_llr_clip` y de las evidencias `ball_dead` (dentro, fuera, abandonado, latch, golpeo) sobre la versión actual | `exp/muerto2` | coordinador (`C:\MTAH2027\wt-muerto2`) | desde 13-nov 04:10: 6 barridos seguidos, un banco cada vez |
 | Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 medido: cumple (a), (b) y (e); (c) parado por falta de memoria; (d) ver abajo. Herramientas IDSSE y sentido de ataque ya en `josep/mejoras` (638444d, mismo hash) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
