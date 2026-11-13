@@ -3,7 +3,7 @@
 More than a Hack 2027, Phase 1. Technical document of the submission `DataScienceClass21.csv`.
 
 > Living document: it describes the version on branch `josep/mejoras` (control model v6 trained on
-> 10 matches, dead-ball weight 0.3, gap evidence 0.1) and is updated with every accepted change. The full experiment
+> 10 matches, dead-ball weight 0.3, gap evidence 0.1, kick from the line) and is updated with every accepted change. The full experiment
 > log is [EXPERIMENTS.md](../EXPERIMENTS.md).
 
 ## 1. Summary
@@ -56,7 +56,8 @@ missing, added +0.001 to +0.002 more (**0.636** on seeds 12-15, macroF1 0.857).
      any of these labels.
    - Ball rules: the ball seen out; lost while crossing, or about to cross, a line; or abandoned
      (nobody within 6 m for 2 s).
-   - After a ball out, dead until the next kick.
+   - After a ball out, dead until the next kick. A kick from a ball on the line that comes into
+     the pitch (corners, throw-ins) also counts as the restart.
    - Goals: dead from the last ball near the goal to the `Kick Off (After Goal)` tag.
    - The second half is always dead before its kick-off at frame 113,742 (FAQ).
 3. **Team evidence, ball seen.**
@@ -149,6 +150,12 @@ missing, added +0.001 to +0.002 more (**0.636** on seeds 12-15, macroF1 0.857).
   label-free checks (§3, learnt dead-ball model). Since then, exploratory runs on our match use
   `check_bar.py`, and regenerating the file uses `run.py --no-public`. Neither loads the public
   ground truth.
+  - On 13-nov a team member proposed six dead-ball and tracking rules. He had found them by
+    inspecting his version's failures in the public 5 minutes, to understand their causes;
+    CHALLENGE.md presents that window as the reference for what is expected.
+  - We treated those rules as unproven ideas. Each was tested alone, with values chosen on the
+    bench, and decided only by the bench, new seeds and the label-free checks. Nothing seen in the
+    public window was used to choose a value or a version.
 - **Pre-registration (from 13-nov).** Before measuring, each experiment's hypothesis, its single
   change and its acceptance rule are written and committed in EXPERIMENTS.md.
   - There are three outcomes: accepted, rejected, or doubtful. A doubtful result gets one more
@@ -324,7 +331,8 @@ downloaded beside our repository and never put in it. **We labelled nothing ours
 | + possession-length weighting | 0.613 | 0.852 |
 | + less weight on the speed model of dead ball (0.5 → 0.3) | 0.619 | 0.855 |
 | + control model trained on 10 matches, Metrica + IDSSE¹ | 0.629 | 0.856 |
-| + its gap model as weak evidence where the ball is missing (**current**)² | **0.636** | **0.857** |
+| + its gap model as weak evidence where the ball is missing² | 0.636 | 0.857 |
+| + a kick from the line restarts play (**current**)³ | **+0.002 / +0.003** | **+0.001** |
 
 ¹ Measured on new degradation seeds (4-7), where the previous version scores 0.616 / 0.854: a
 paired gain of +0.013 (standard error 0.002). Over the 10 matches (Metrica + IDSSE), +0.019
@@ -335,6 +343,9 @@ paired gain of +0.013 (standard error 0.002). Over the 10 matches (Metrica + IDS
 gained more (+0.005) but moved one stoppage on our match, and was rejected by the rule written
 before measuring.
 
+³ Paired gain over the previous version: +0.0023 on seeds 0-3 (0.6322 -> 0.6345, standard error
+0.0002) and +0.0032 on seeds 4-7 (standard error 0.0004), 12 of 12 cells in both rounds.
+
 Each accepted step improved all 4 conditions, and 7 to 12 of the 12 cells in every round it was
 measured on. The last ones gained 0.002–0.013 each, with paired standard errors of
 0.0004–0.0022. On a single full match, spellF1 noise is about ±0.04, which is why decisions use
@@ -342,14 +353,14 @@ paired comparisons over 48 bench runs.
 
 On our match, label-free aggregates of the current version:
 
-- 269 possessions with a mean of 14.1 s;
-- 40.4 % of graded frames dead, in 105 stoppages;
+- 270 possessions with a mean of 14.0 s;
+- 40.3 % of graded frames dead, in 106 stoppages;
 - 96.6 % of Smart Tagging set pieces have a predicted stoppage.
 
 The public 5 minutes are no longer looked at, not even as a smoke test (`run.py --no-public`). The last smoke test, of control model v4, gave spellF1 0.62 and macroF1 0.85 (17 possessions).
 
-Submission file: H 55,377 / A 39,316 / D 64,164 / X 40,462 frames. SHA256
-`1077ece7376fcf42aaa6027bbe324e8be286ca01c6d067e76fd0e2f0c028143c`.
+Submission file: H 55,413 / A 39,412 / D 64,032 / X 40,462 frames. SHA256
+`744deca5ffb8e26678f0a08bc2bdd7aaf0feac685171885ea423257f0e32047a`.
 
 ## 7. Limitations and what we would do next
 
