@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 05:45
+**Actualizado:** 2026-11-13 11:35
 
 **Calendario:**
 
@@ -33,8 +33,8 @@ oficiales. CSV actual: SHA256 `b122c3fc…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 medido: cumple (a), (b) y (e); (c) parado por falta de memoria; (d) ver abajo. Herramientas IDSSE y sentido de ataque ya en `josep/mejoras` (638444d, mismo hash) |
-| Modelo de control entrenado también con copias `light` (`train_mix`, idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | v7 entrenado (pérdida en partido no visto 0.169 / 0.159 / 0.182, frente a 0.160 / 0.159 / 0.179 de v4); el banco lo paró la falta de memoria: espera a Josep |
+| Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 cumple (a), (b), (d) (Josep, lectura relativa) y (e). Ahora (c): semillas 4-7 encima de la versión actual, primero Metrica y luego DFL, de uno en uno |
+| Modelo de control entrenado también con copias `light` (`train_mix`, idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | v7 entrenado (pérdida en partido no visto 0.169 / 0.159 / 0.182, frente a 0.160 / 0.159 / 0.179 de v4); banco en cola, después de v6 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -139,33 +139,15 @@ Si un agente rompe el protocolo, se anota aquí con lo que vio y cómo se resolv
 Responde siempre en `C:\MTAH2027\DECISIONES_JOSEP.md`, a mano: es lo único que cuenta como
 aprobación y ningún agente puede escribirlo.
 
-- **Metrica necesita su propia línea de aprobación (12-nov).** Su repo no tiene fichero de licencia.
-  El README solo dice "be responsible with the use of this data" y "acknowledge the source", así
-  que la política general (licencia abierta explícita) no la cubre. Todo lo aceptado (banco y
-  modelos v1-v4) depende de ella. Se sigue usando porque ya estaba en uso y `check_rules.py` la da
-  por aprobada. Si estás de acuerdo, añade en DECISIONES_JOSEP.md, "Aprobaciones concretas", una
-  línea como esta: "Metrica Sports sample data (3 partidos anonimizados, github
-  metrica-sports/sample-data, sin licencia explícita): aprobada para entrenar y validar, citando la
-  fuente."
+- **Resuelto por Josep el 13-nov (DECISIONES_JOSEP.md):**
+  - Metrica queda aprobada.
+  - Bancos con `--workers 2`, siempre de uno en uno. Si Claude Code mata uno, se relanza una vez
+    con `--workers 1`; si vuelve a morir, se anota aquí y se sigue con otra cosa.
+  - v6: se relanzan las semillas 4-7 (c), y (d) se da por cumplida en lectura relativa.
+
+  La confirmación (c) de v6 se mide encima de la versión actual: v6 + `dead_weight` 0.3 frente
+  a v4 + 0.3.
 - **Política de datos de otros partidos:** APROBADA el 12-nov. IDSSE (línea 1) la cumple.
-- **MEMORIA, todo parado (13-nov 05:40).** Claude Code mata los bancos que corren en segundo
-  plano cuando falta memoria (6,7 GB libres de 15,4) y no deja relanzarlos sin tu permiso. Esta
-  vez fue un solo banco de Metrica (v7, `train_mix`), con el entrenamiento ya hecho. Opciones:
-  - (a) me autorizas a relanzar los bancos con `--workers 2`: la mitad de memoria y el doble de
-    tiempo, ~20 min por banco;
-  - (b) arrancas Claude Code con `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1` (solo puedes
-    hacerlo tú);
-  - (c) cierras programas para liberar memoria.
-
-  Pendientes de banco: v7 (`exp/mezcla`) y v6 (`exp/idsse`).
-- **v6 (13-nov), dos decisiones tuyas:**
-  1. ¿Relanzo las semillas 4-7 de v6 (condición c)? Claude Code las paró por falta de memoria y
-     no deja relanzarlas sin tu permiso. Iría un banco cada vez: hay 8 GB libres de 15,4.
-  2. ¿Vale (d)? El umbral absoluto que escribí no se cumple (72,1 % < 76 %), pero la relación
-     con el banco es la misma que con v4. Si dices que no, v6 queda descartado.
-
-  Mientras tanto, `josep/mejoras` es v4 + `dead_weight` 0.3. Si sigue adelante, v6 se vuelve a
-  medir encima (semillas 0-3 y 4-7, Metrica y DFL), un banco cada vez.
 - **Regla de decisión para cambios de datos (12-nov):** para v6 se juzga sobre todo con el banco
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
