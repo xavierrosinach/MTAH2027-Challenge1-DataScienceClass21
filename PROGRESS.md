@@ -115,23 +115,33 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 
 ## Cola de ideas (en orden)
 
-1. (en curso) Más partidos: IDSSE. Cumple la política general de Josep del 12-nov: descarga
-   pública sin registro (figshare) y licencia CC BY 4.0, comprobadas en la API de figshare.
-2. (hecho) Constantes de reglas: `dead_weight` 0.3 aceptado; el resto, sin efecto o sin
-   transferir.
-3. (en curso) Modelo de control entrenado también con copias `light` (`train_mix`), para que no
-   dependa de una sola degradación. Es la idea 4 de Codex (consulta del 13-nov,
-   `C:/consultas-ia/ideas-posesion.md`).
-4. Otras ideas de Codex, por probar:
-   - escalar la confianza del modelo según la calidad del tracking (distancia del balón al
-     jugador más cercano, jugadores visibles);
-   - un estado "disputado" en Viterbi;
-   - un corrector temporal aprendido sobre los log-odds.
-5. Modelo de secuencias de toques, para las posesiones de menos de 2 s (los rasgos de toques ya
-   fallaron).
-6. Smart Tagging como pista de equipo (no se puede validar en el banco).
-7. Otros datasets abiertos para más adelante: SkillCorner opendata (licencia MIT, tracking de
-   broadcast). Falta comprobar qué etiquetas trae y si sirven.
+Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
+(`C:/consultas-ia/consulta-NN-*.md`). Cada idea tiene una prueba o un motivo escrito.
+
+1. **(en curso) #10 v6:** modelo entrenado con 10 partidos (Metrica + IDSSE).
+2. **(en curso) #11 `train_mix`:** entrenar también con copias `light` (Codex 01-4). Si da
+   señal, ampliarlo a degradaciones variadas: tasa y duración de huecos, ruido y distancia
+   balón-jugador por separado (Codex 02-1, +0.005 a +0.02 según Codex).
+3. **Interpolar huecos de balón más largos** (`ball_gaps.interpolate_max_frames` 12 → 25 / 50).
+   Más frames con balón para el modelo, sin reentrenar. Es un barrido barato.
+4. **Coste de cambio H↔A según la evidencia local de cambio** (Codex 02-3) o confianza según la
+   calidad del tracking (Codex 01-3). Coste medio. El oráculo de cambios perfectos solo da ~+0.03,
+   así que se espera poco.
+5. **Decodificar los huecos largos por bloques**, con una sola hipótesis de posesión por hueco
+   (Codex 02-4). Coste medio-alto; los huecos con juego vivo son el 10 % de los frames vivos.
+6. **Estado "disputado" y corrector temporal aprendido** (Codex 01-6, 01-8). Coste alto: no da
+   tiempo a cerrarlos antes de la congelación. Motivo para no probarlos.
+7. **Modelo de secuencias de toques** para las posesiones < 2 s. Los rasgos de toques ya fallaron
+   (#4), y dentro de las posesiones cortas perdidas la evidencia no ve nada (−0.1). Motivo para no
+   probarlo: falta señal, no modelo.
+8. **Smart Tagging como pista de equipo** (Codex 01-7). No hay un sustituto validable de las fases
+   de ataque en el banco. Motivo para no probarlo: no se podría medir.
+9. **Descartadas con motivo (Codex 02):**
+   - calibrar la resolución temporal del GT (02-2): ya lo cubre la condición coarseGT;
+   - enmascarar rasgos del balón en el entrenamiento (02-5): el modelo de control solo se usa con
+     el balón visto, y los huecos van por el modelo de forma.
+10. **SkillCorner opendata** (MIT, tracking de broadcast). Primero hay que ver si trae etiquetas
+    de posesión; solo si sobra tiempo.
 
 ## Incidencias de reglas
 
