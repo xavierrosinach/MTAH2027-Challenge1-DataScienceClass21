@@ -58,9 +58,10 @@ def game_data(job):
             "d_h": f["d_h"][live], "d_a": f["d_a"][live]}
 
 
-def fit_models(parts, l2, mlp=None, power=0.0):
+def fit_models(parts, l2, mlp=None, power=0.0, gap_mlp=False):
     """Conditional logits for frames with and without the ball; with `mlp` (its settings), the
-    model for frames with the ball is the antisymmetric network instead. power > 0 weights each
+    model for frames with the ball is the antisymmetric network instead, and with gap_mlp too the
+    one for frames without it (context.control.gap_model_type: mlp). power > 0 weights each
     frame by (length of its true possession)^-power (1: every possession weighs the same, as in
     spellF1); weights are normalised to mean 1."""
     X = np.concatenate([p["X"] for p in parts])
@@ -74,6 +75,8 @@ def fit_models(parts, l2, mlp=None, power=0.0):
     if mlp is None:
         return {"seen": control.fit(X[seen], y[seen], l2, sw=sw_seen), "gap": gap}
     S = np.concatenate([p["S"] for p in parts]).astype(float)
+    if gap_mlp:
+        gap = control.fit_mlp(X[~seen], S[~seen], y[~seen], sw=sw_gap, **mlp)
     return {"seen": control.fit_mlp(X[seen], S[seen], y[seen], sw=sw_seen, **mlp), "gap": gap}
 
 
@@ -87,6 +90,7 @@ def evaluate(models, part, contact_m):
     rule_ok = (d_h < d_a) == (y == 1)
     return {"game": part["game"], "acc_seen": ok[seen].mean(), "acc_gap": ok[~seen].mean(),
             "logloss_seen": -np.mean(np.where(y == 1, np.log(p), np.log(1 - p))[seen]),
+            "logloss_gap": -np.mean(np.where(y == 1, np.log(p), np.log(1 - p))[~seen]),
             "conf_share": np.mean(np.abs(z[seen]) > 2),
             "acc_conf": ok[seen & (np.abs(z) > 2)].mean(),
             "rule_cover": contact[seen].mean(), "rule_acc_contact": rule_ok[contact].mean(),
@@ -100,11 +104,15 @@ def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, ar
         info["weight_power"] = power
     if mlp is not None:
         info["mlp"] = mlp
+    # the network for frames without the ball too (only for the network file, not its ensemble)
+    gap_mlp = mlp is not None and cfg["context"]["control"].get("gap_model_type") == "mlp"
+    if gap_mlp:
+        info["gap_model_type"] = "mlp"
     logo_dir = B.logo_dir(cfg, out)
     os.makedirs(logo_dir, exist_ok=True)
     rows = []
     for g in games:
-        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp, power)
+        models = fit_models([p for p in train if p["game"] != g], args.l2, mlp, power, gap_mlp)
         if not args.no_save:
             control.save(os.path.join(logo_dir, "logo_{}.json".format(g)), names, models,
                          dict(info, games=[x for x in games if x != g]))
@@ -116,7 +124,7 @@ def train_one(out, mlp, power, train, parts, games, seeds, bench, cfg, names, ar
         print(pd.DataFrame(rows).set_index("game").to_string())
     if args.no_save:
         return None
-    models = fit_models(train, args.l2, mlp, power)
+    models = fit_models(train, args.l2, mlp, power, gap_mlp)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     control.save(out, names, models, dict(info, games=games))
     print("full model -> {}".format(out))
