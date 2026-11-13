@@ -151,6 +151,7 @@ nota pública no cuenta para nada.
 |---|---|---|---|
 | 13-nov tarde | 80ad34c (11-nov, ya integrado en `josep/mejoras` el 12-nov) | ninguna | nada nuevo |
 | 13-nov 17:11 | 80ad34c | ninguna | nada nuevo |
+| 13-nov 18:34 | 80ad34c | **`origin/xavier/mejoras` 0b5782d** (13-nov 18:30, sobre nuestro af96572) | 6 reglas de balón parado detrás de opciones, en `xavier/prova-xavier.yaml`; se mide en el banco |
 
 - **13-nov:** Josep cuenta que Xavi tiene un "0,7 de F1" sin subir. No sabemos sobre qué lo ha
   medido; probablemente sobre los 5 minutos públicos, que no deciden nada (R2). No cuenta hasta
@@ -224,6 +225,23 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
 ## Incidencias de reglas
 
 Si un agente rompe el protocolo, se anota aquí con lo que vio y cómo se resolvió.
+
+- **13-nov 18:35, rama de Xavier (`origin/xavier/mejoras` 0b5782d).**
+  - Su `xavier/README.md` dice que sus reglas salen de revisar frame a frame los fallos de su
+    versión en los 5 minutos públicos, "solo para entender la causa".
+  - También da la nota pública de su versión y describe tramos concretos del partido.
+  - El coordinador leyó ese README (los `.md` están en la lista permitida) antes de saber qué
+    contenía.
+  - Resolución:
+    - nada de lo leído sobre la ventana pública se usa: ni su nota pública ni sus tramos;
+    - sus ideas se prueban solo con valores elegidos en el banco, según la sección "Trabajo de
+      Xavi";
+    - no se leen sus scripts de `xavier/`, que no están en la lista permitida;
+    - la carpeta `xavier/` no debe pasar a `josep/mejoras`: documenta un uso de la ventana pública
+      que el documento técnico dice que no hubo, y contiene descripciones del partido en un repo
+      público.
+
+  Avisado Josep en el chat.
 
 - 12-nov: una ejecución exploratoria de `run.py` imprimió la tabla pública (candidato #7). La
   decisión se tomó sin ella (`check_bar`), y desde entonces se usa `run.py --no-public`.
