@@ -34,6 +34,7 @@ oficiales. CSV actual: SHA256 `b122c3fc…`, 268 posesiones (media 14,1 s), 106 
 | línea | rama | agente | estado |
 |---|---|---|---|
 | Más partidos: IDSSE (7 partidos DFL, CC BY 4.0) para entrenar y ampliar el banco | `exp/idsse` | coordinador (`C:\MTAH2027\wt-idsse`) | v6 medido: cumple (a), (b) y (e); (c) parado por falta de memoria; (d) ver abajo. Herramientas IDSSE y sentido de ataque ya en `josep/mejoras` (638444d, mismo hash) |
+| Modelo de control entrenado también con copias `light` (`train_mix`, idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | desde 13-nov 05:00: entrenando v7 y después el banco |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -106,9 +107,18 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
    pública sin registro (figshare) y licencia CC BY 4.0, comprobadas en la API de figshare.
 2. (hecho) Constantes de reglas: `dead_weight` 0.3 aceptado; el resto, sin efecto o sin
    transferir.
-3. Modelo de secuencias de toques, para las posesiones de menos de 2 s.
-4. Smart Tagging como pista de equipo.
-5. Otros datasets abiertos para más adelante: SkillCorner opendata (licencia MIT, tracking de
+3. (en curso) Modelo de control entrenado también con copias `light` (`train_mix`), para que no
+   dependa de una sola degradación. Es la idea 4 de Codex (consulta del 13-nov,
+   `C:/consultas-ia/ideas-posesion.md`).
+4. Otras ideas de Codex, por probar:
+   - escalar la confianza del modelo según la calidad del tracking (distancia del balón al
+     jugador más cercano, jugadores visibles);
+   - un estado "disputado" en Viterbi;
+   - un corrector temporal aprendido sobre los log-odds.
+5. Modelo de secuencias de toques, para las posesiones de menos de 2 s (los rasgos de toques ya
+   fallaron).
+6. Smart Tagging como pista de equipo (no se puede validar en el banco).
+7. Otros datasets abiertos para más adelante: SkillCorner opendata (licencia MIT, tracking de
    broadcast). Falta comprobar qué etiquetas trae y si sirven.
 
 ## Incidencias de reglas
