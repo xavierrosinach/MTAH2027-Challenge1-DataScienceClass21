@@ -655,3 +655,34 @@ Pre-registered 13-nov, before measuring.
 - The dead-ball line is closed for this deadline.
 - The tool `degrade.hide_dead_ball` stays: it makes the IDSSE bench's ball visibility closer to
   ours. But hiding ALL dead time is too strong a model of our tracking.
+
+### #15 v9: control model trained on 20 games, SkillCorner added (branch `exp/skillcorner`)
+
+Pre-registered 13-nov, before measuring.
+- **Change:** `context.control.model` / `ensemble` -> `models/control_v9_*`.
+  - Same features, network + linear, `weight_power` 0.25.
+  - Trained on `validation/bench_all20_events.yaml`: v6's 10 games plus 10 SkillCorner games
+    (A-League 2024/25, broadcast tracking at 10 fps resampled to 25, MIT licence).
+  - SkillCorner ground truth: dead outside its "phases of play"; while alive, the team of the
+    last `player_possession` event. Its "possession group" field disagrees with those events on
+    17 % of live frames and with the nearest-player check on 15 %.
+  - One SkillCorner game is left out: its phases break during play (41 stoppages under 3 s).
+  - Training memory: `train_control.py --no-heldout --logo-games <the 10 bench games>`, a
+    memory-only option: same model files, no held-out copies.
+- **Hypothesis:** going from 3 to 10 games was the largest gain (+0.013 / +0.019). A third
+  provider, with tracking even worse than ours (broadcast: ~14.5 players seen, ball 1.5 m from
+  the nearest player), adds variety for an unseen provider.
+- **Risk:** its ground truth is coarser (2.6 possessions per minute, 12 % < 2 s), which could teach
+  coarser cuts; the 4-condition rule catches that.
+- **Rule** (as #10, on v6):
+  - (a) 10-game bench (Metrica + IDSSE, `bench.yaml` + `bench_dfl.yaml`), seeds 0-3: mean spellF1
+    up under each of the 4 conditions, more than 20/40 cells, macroF1 not down;
+  - (b) Metrica alone, seeds 0-3: up under each of the 4 conditions, >= 7/12 cells, macroF1 not
+    down, game 3 not down;
+  - (c) the same (a) and (b) on seeds 4-7;
+  - (d) `check_control`, relative: |llr| > 2 on BAR-ATH within 5 points of the bench's, and sign
+    flips per minute on BAR-ATH at most 1.1x the bench's (v6: 72.1 vs 75.2 %, 7.13 vs 7.16);
+  - (e) `check_bar`: 240-300 possessions; stoppages >= 106; set pieces with a stoppage >= 96.6 %.
+  - Doubtful: seeds 8-11.
+- Not measured on a SkillCorner bench: its ground truth is not the official construction and its
+  tracking is harder than ours. It is training data only.
