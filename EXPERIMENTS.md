@@ -95,6 +95,8 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `descartado/muerto/to-dead-20` | 9 | `to_dead` 10 -> 20 (fewer stoppages on BAR-ATH) |
 | `aceptado/datos/v6-idsse` | 10 | control model trained on 10 games, IDSSE added (current) |
 | `descartado/control/train-mix-light` | 11 | also trained on `light` copies (cuts finer, loses coarseGT) |
+| `descartado/huecos/interp-50` | 12 | interpolate ball gaps up to 2 s (noise) |
+| `descartado/muerto/modelo-10-partidos` | 13 | learnt dead-ball model on 10 games, ball hidden in dead time (fewer stoppages on BAR-ATH) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their

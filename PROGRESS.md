@@ -38,8 +38,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador | regla registrada; barrido después del entrenamiento de #13 |
-| #13 modelo de balón muerto aprendido, reintentado con 10 partidos y el balón escondido en tiempo muerto | `exp/muerto-idsse` | coordinador (`C:/MTAH2027/wt-muerto-idsse`) | código y regla listos; entrena cuando acabe el banco de #12. Primer filtro: `check_bar` |
+| #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador (`C:/MTAH2027/wt-gap`) | barrido en Metrica, semillas 0-3, en marcha |
 | Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | fase 1 hecha (commit 2567a96): MIT; 20 partidos en el repo, 10 integrados. Muerto creíble (46 %); el GT de equipo de su tracking es ruidoso (coincide 83 % con sus eventos) y grueso (3,3 posesiones por minuto). Fase 2 (entrenar con 20 partidos, pico de 6-7 GB), por decidir después de #13 y #14 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -109,6 +108,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | datos | `aceptado/datos/v6-idsse` | modelo de control entrenado con 10 partidos (3 Metrica + 7 IDSSE) | 0.629 en semillas 4-7 (+0.013, error típico 0.002); 10 partidos +0.019 (39/40 celdas) | **aceptada (actual)** |
 | 13-nov | control | `descartado/control/train-mix-light` | v6 entrenado también con copias `light` | +0.0027, pero coarseGT −0.0053 | descartada: corta más fino (+6 posesiones) |
 | 13-nov | huecos | `descartado/huecos/interp-50` | interpolar huecos del balón hasta 1-2 s | +0.0005; con semillas 8-11, −0.0004 | descartada: ruido |
+| 13-nov | muerto | `descartado/muerto/modelo-10-partidos` | modelo de balón muerto aprendido con 10 partidos, balón escondido en tiempo muerto | primer filtro: paradas en BAR-ATH 106 -> 82 | descartada; línea del muerto aprendido cerrada |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
@@ -116,7 +116,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 |---|---|---|---|
 | Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #11 `train_mix` descartado (corta más fino); siguiente: evidencia mejor con el mismo corte (consulta 02-3, 01-3) |
 | Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | **v6 aceptado** (+0.013 en Metrica, +0.019 en 10 partidos): es la mayor ganancia desde v2 | `errors.py` sobre v6; SkillCorner (MIT) sin explorar |
-| Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | oráculo +0.057 sobre v6; primero, el banco IDSSE con el balón escondido en tiempo muerto (cola 2b) |
+| Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | #13 (aprendido con 10 partidos) también falla en BAR-ATH (106 -> 82 paradas): línea del muerto aprendido CERRADA. Solo transfiere el modelo ajustado en nuestro propio partido |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
 | Huecos sin balón | `gap_weight` (v3); interpolar 1-2 s (#12) | ruido; ruido | #14: `gap_weight` con el modelo de huecos de v6 (10 partidos) |
