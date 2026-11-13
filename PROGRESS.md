@@ -38,7 +38,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #16 `gap_weight` 0.1, solo confirmación (semillas 8-11 y 12-15, que nunca se usaron con este valor) | `exp/gap01` | coordinador (`C:/MTAH2027/wt-gap01`) | semillas 8-11 en marcha |
+| #16 `gap_weight` 0.1, solo confirmación (semillas 8-11 y 12-15, que nunca se usaron con este valor) | `exp/gap01` | coordinador (`C:/MTAH2027/wt-gap01`) | semillas 8-11: Claude Code mató el banco por falta de memoria (3,4 GB libres, con Brave abierto); se relanzó una vez con `--workers 1`, según la regla de Josep |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
