@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 14:30
+**Actualizado:** 2026-11-13 (tarde)
 
 **Calendario:**
 
@@ -17,7 +17,8 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 
 | | banco spellF1 | banco macroF1 |
 |---|--:|--:|
-| **actual: v6 = modelo entrenado con 10 partidos (Metrica + IDSSE)** (13-nov) | **0.629** ¹ | **0.856** ¹ |
+| **actual: v6 + evidencia de equipo en los huecos (`gap_weight` 0.1)** (13-nov) | **0.636** ² | **0.857** ² |
+| v6 = modelo entrenado con 10 partidos (Metrica + IDSSE) (13-nov) | 0.629 ¹ | 0.856 ¹ |
 | v4 + `dead_weight` 0.3 (13-nov) | 0.619 | 0.855 |
 | v4 (modelo de control aprendido + movimiento + red + peso por posesión) | 0.613 | 0.852 |
 | inicio del 12-nov (modelo de control v1) | 0.583 | 0.847 |
@@ -26,19 +27,20 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 
 ¹ Con semillas nuevas (4-7), en las que la versión anterior saca 0.616: ganancia emparejada
 +0.013 (error típico 0.002). En el banco de 10 partidos (Metrica + IDSSE), +0.019.
+² Semillas 12-15, donde v6 saca 0.634: +0.0019 (en las 8-11, +0.0011). Ganancia pequeña pero
+constante.
 
 Mejora aproximada (las semillas no son las mismas): **+38 %** sobre main y **+97 %** sobre el
 baseline oficial (banco de Metrica).
 
 Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking degradado como el
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
-oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 paradas.
+oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 paradas.
 
 ## En curso
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #16 `gap_weight` 0.1, solo confirmación (semillas 8-11 y 12-15, que nunca se usaron con este valor) | `exp/gap01` | coordinador (`C:/MTAH2027/wt-gap01`) | semillas 8-11: Claude Code mató el banco por falta de memoria (3,4 GB libres, con Brave abierto); se relanzó una vez con `--workers 1`, según la regla de Josep |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -104,12 +106,13 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | muerto | `descartado/muerto/to-dead-20` | coste de pasar a muerto 10 -> 20 | 0.616 (+0.003, 11/12) | descartada: en BAR-ATH las paradas bajan de 104 a 94 |
 | 13-nov | reglas | (barridos, sin etiqueta) | `pass_llr`, `kick_team_llr`, `from_dead` | ±0.002 | sin efecto (EXPERIMENTS #9) |
 | 13-nov | muerto | (barridos, sin etiqueta) | `dead_llr_clip`, `inside_llr`, `out_llr`, `isolated_llr`, `latch_llr`, `kick_llr` sobre la versión actual | ±0.001 | sin efecto; quitar `inside_llr` cuesta −0.020 (EXPERIMENTS #9) |
-| 13-nov | datos | `aceptado/datos/v6-idsse` | modelo de control entrenado con 10 partidos (3 Metrica + 7 IDSSE) | 0.629 en semillas 4-7 (+0.013, error típico 0.002); 10 partidos +0.019 (39/40 celdas) | **aceptada (actual)** |
+| 13-nov | datos | `aceptado/datos/v6-idsse` | modelo de control entrenado con 10 partidos (3 Metrica + 7 IDSSE) | 0.629 en semillas 4-7 (+0.013, error típico 0.002); 10 partidos +0.019 (39/40 celdas) | aceptada |
 | 13-nov | control | `descartado/control/train-mix-light` | v6 entrenado también con copias `light` | +0.0027, pero coarseGT −0.0053 | descartada: corta más fino (+6 posesiones) |
 | 13-nov | huecos | `descartado/huecos/interp-50` | interpolar huecos del balón hasta 1-2 s | +0.0005; con semillas 8-11, −0.0004 | descartada: ruido |
 | 13-nov | muerto | `descartado/muerto/modelo-10-partidos` | modelo de balón muerto aprendido con 10 partidos, balón escondido en tiempo muerto | primer filtro: paradas en BAR-ATH 106 -> 82 | descartada; línea del muerto aprendido cerrada |
 | 13-nov | huecos | `descartado/huecos/gap-weight-03` | evidencia de equipo en los huecos (`gap_weight` 0.3, modelo de v6) | +0.0050 (semillas 0-3), +0.0044 (4-7), 11-12/12 celdas | descartada por su regla: check_bar con 105 paradas, menos de 106 (umbral corregido solo para lo siguiente) |
 | 13-nov | datos | `descartado/datos/v9-skillcorner` | modelo de control con 20 partidos (+10 SkillCorner) | −0.0063 (error típico 0.0015), 1/12 celdas, −6,7 posesiones | descartada: su GT grueso enseña a cortar más grueso |
+| 13-nov | huecos | `aceptado/huecos/gap-weight-01` | evidencia de equipo en los huecos, peso 0.1 (confirmación con semillas nuevas) | 8-11 +0.0011, 12-15 +0.0019; check_bar 105 paradas (umbral ±2) | **aceptada (actual)** |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
@@ -120,7 +123,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | #13 (aprendido con 10 partidos) también falla en BAR-ATH (106 -> 82 paradas): línea del muerto aprendido CERRADA. Solo transfiere el modelo ajustado en nuestro propio partido |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
-| Huecos sin balón | `gap_weight` (v3); interpolar 1-2 s (#12); `gap_weight` 0.3 con v6 (#14) | ruido; ruido; **señal real** (+0.004-0.005), pero descartada por 105 < 106 paradas | #16: `gap_weight` 0.1 confirmado SOLO con semillas nuevas (8-11), si hay tiempo |
+| Huecos sin balón | `gap_weight` (v3); interpolar 1-2 s (#12); `gap_weight` 0.3 con v6 (#14) | ruido; ruido; **señal real** (+0.004-0.005), pero descartada por 105 < 106 paradas | **#16 `gap_weight` 0.1 aceptado** (+0.001-0.002). Siguiente: #18, peso de la forma |
 | Smart Tagging | evidencia débil de las fases de ataque en huecos (0.03) | sin medir en el banco (no hay sustituto de las fases) | motivo para no probarlo, o un sustituto desde eventos |
 
 ## Cola de ideas (en orden)

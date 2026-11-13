@@ -3,7 +3,7 @@
 More than a Hack 2027, Phase 1. Technical document of the submission `DataScienceClass21.csv`.
 
 > Living document: it describes the version on branch `josep/mejoras` (control model v6 trained on
-> 10 matches, dead-ball weight 0.3) and is updated with every accepted change. The full experiment
+> 10 matches, dead-ball weight 0.3, gap evidence 0.1) and is updated with every accepted change. The full experiment
 > log is [EXPERIMENTS.md](../EXPERIMENTS.md).
 
 ## 1. Summary
@@ -24,8 +24,9 @@ of state. No label of the provided match was made or used by a person.
 Every design decision was taken on **validation benches built from those other matches**, never
 on the public 5 minutes. On the Metrica bench (3 matches × 4 tracking-degradation seeds × 4
 conditions), mean spellF1 went from 0.319 (official `baseline_smooth50`), and from 0.455 for our
-first rule-based version, to 0.619. The 10-match model then added +0.013 on new seeds (**0.629**,
-macroF1 0.856), and +0.019 over all 10 matches.
+first rule-based version, to 0.619. The 10-match model then added +0.013 on new seeds (0.629,
+macroF1 0.856), and +0.019 over all 10 matches. Its gap model, as weak evidence where the ball is
+missing, added +0.001 to +0.002 more (**0.636** on seeds 12-15, macroF1 0.857).
 
 ## 2. Approach
 
@@ -69,6 +70,7 @@ macroF1 0.856), and +0.019 over all 10 matches.
    - A team-shape model (width, depth, advance). It is fitted on frames where the first decode's
      team is within 1 m of the visible ball and the rival is more than 2 m away, so it is
      self-supervised as well.
+   - The learnt control model's part for frames without the ball (2.3), weighted 0.1 per frame.
    - The attacking phases of the Smart Tagging, as weak evidence.
 5. **Viterbi decoding per half** over {H, A, D}.
    - Switching H↔A costs 16, going dead costs 10 and restarting costs 5.
@@ -107,8 +109,9 @@ macroF1 0.856), and +0.019 over all 10 matches.
   failed in one IDSSE half where the home team spent the half in the rival's half. On our match
   and on Metrica both readings agree in every half (`validation/check_direction.py`), so the
   submission did not change.
-- **How it is used.** It runs on frames with the ball seen (weight 1, clipped to ±4 log-odds per
-  frame) and replaces the nearest-player evidence.
+- **How it is used.** On frames with the ball seen it replaces the nearest-player evidence
+  (weight 1, clipped to ±4 log-odds per frame). A second conditional logit, trained the same
+  way on frames without the ball, adds weak evidence in ball gaps (weight 0.1).
 - **Accuracy.** On a held-out game it gets the team right on ~93 % of live frames with the ball
   seen, against 73–75 % for "team of the nearest player".
 - **Implementation.** Plain numpy; the weights are JSON files in `models/`. Retraining
@@ -188,6 +191,14 @@ Tried and dropped, with the bench numbers in EXPERIMENTS.md:
 - **Re-tuning the pass and kick evidence for the learnt model.** No effect.
 - **A dearer switch to dead ball (`to_dead` 10 → 20).** It won on the bench, but on our match it
   gave fewer stoppages (104 → 94) and fewer set pieces with a stoppage (96.6 → 94.8 %).
+- **Training also on lightly degraded copies.** It cut possessions finer and lost with the coarse
+  ground truth.
+- **Interpolating longer ball gaps (1-2 s).** Noise.
+- **The learnt dead-ball model retrained on 10 matches, with the ball hidden in dead time.** On
+  our match it lost stoppages again (106 → 82).
+- **Training on 10 more matches from a third provider** (SkillCorner open data, broadcast
+  tracking, MIT licence). Their possession labels are coarser (2.6 per minute). The model learnt
+  to cut coarser and lost 0.006 on the bench. Its data and code are kept in a tag, unused.
 - **A dead-ball model learnt on the Metrica games.** It gave +0.017 on the bench but did not
   transfer to our match: fewer stoppages (104 → 93) and fewer Smart Tagging set pieces with a
   stoppage (96.6 → 91.4 %). The code is kept, switched off (`context.dead_model`).
@@ -296,11 +307,17 @@ downloaded beside our repository and never put in it. **We labelled nothing ours
 | + averaged with the antisymmetric network | 0.605 | 0.851 |
 | + possession-length weighting | 0.613 | 0.852 |
 | + less weight on the speed model of dead ball (0.5 → 0.3) | 0.619 | 0.855 |
-| + control model trained on 10 matches, Metrica + IDSSE (**current**)¹ | **0.629** | **0.856** |
+| + control model trained on 10 matches, Metrica + IDSSE¹ | 0.629 | 0.856 |
+| + its gap model as weak evidence where the ball is missing (**current**)² | **0.636** | **0.857** |
 
 ¹ Measured on new degradation seeds (4-7), where the previous version scores 0.616 / 0.854: a
 paired gain of +0.013 (standard error 0.002). Over the 10 matches (Metrica + IDSSE), +0.019
 (standard error 0.001), 39 of 40 (condition, match) cells better.
+
+² Confirmed on seeds 8-11 (+0.0011, standard error 0.0005) and 12-15 (+0.0019, standard error
+0.0004; the row shows these seeds, where the previous version scores 0.634). A weight of 0.3 had
+gained more (+0.005) but moved one stoppage on our match, and was rejected by the rule written
+before measuring.
 
 Each accepted step improved all 4 conditions and 10 to 12 of the 12 cells. The last ones gained
 0.006–0.013 each, with paired standard errors of 0.0008–0.0022. On a single full match, spellF1
@@ -308,14 +325,14 @@ noise is about ±0.04, which is why decisions use paired comparisons over 48 ben
 
 On our match, label-free aggregates of the current version:
 
-- 268 possessions with a mean of 14.1 s;
-- 40.4 % of graded frames dead, in 106 stoppages;
+- 269 possessions with a mean of 14.1 s;
+- 40.4 % of graded frames dead, in 105 stoppages;
 - 96.6 % of Smart Tagging set pieces have a predicted stoppage.
 
 The public 5 minutes are no longer looked at, not even as a smoke test (`run.py --no-public`). The last smoke test, of control model v4, gave spellF1 0.62 and macroF1 0.85 (17 possessions).
 
-Submission file: H 54,891 / A 39,856 / D 64,110 / X 40,462 frames. SHA256
-`c53b0b1baece1e93cf017ac49ebb51b37c93f4d9c406e44fe99b1a668e8b1a02`.
+Submission file: H 55,377 / A 39,316 / D 64,164 / X 40,462 frames. SHA256
+`1077ece7376fcf42aaa6027bbe324e8be286ca01c6d067e76fd0e2f0c028143c`.
 
 ## 7. Limitations and what we would do next
 
