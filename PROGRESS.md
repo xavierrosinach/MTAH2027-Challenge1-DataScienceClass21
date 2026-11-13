@@ -194,7 +194,7 @@ aprobación y ningún agente puede escribirlo.
   de 10 partidos, más un suelo en el de Metrica (ver "Regla para la línea IDSSE"). Si prefieres
   la regla de siempre (solo Metrica), escríbelo en DECISIONES_JOSEP.md y se reabre.
 - **Bloqueos del guardián (worker SkillCorner, 13-nov), sin consecuencias:** un listado de procesos con la palabra "python" (falso positivo) y una lectura del registro de bloqueos con Bash (debía usar Read). No se vio nada.
-- **Falsos positivos del guardián (coordinador, 13-nov 17:20), sin consecuencias.** Dos comandos
+- **Falsos positivos del guardián (coordinador, 13-nov, primera hora de la tarde), sin consecuencias.** Dos comandos
   que editaban texto (un `sed` sobre el docstring del script de entrenamiento del modelo de
   balón muerto, y esta misma nota) contenían el nombre de ese script precedido de "python" y se
   bloquearon como si lo ejecutaran. Las ediciones se hicieron con la herramienta Edit, sin
