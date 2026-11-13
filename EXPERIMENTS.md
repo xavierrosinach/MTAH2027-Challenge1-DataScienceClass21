@@ -621,3 +621,35 @@ Pre-registered 13-nov, before measuring.
   - The candidate needs the same on seeds 4-7, plus `check_bar` (240-300 possessions; stoppages
     and set pieces with a stoppage not below 106 / 96.6 %).
   - Doubtful: seeds 8-11.
+
+**Result of #13 (13-nov), REJECTED at the first check: tag `descartado/muerto/modelo-10-partidos`.**
+- Held-out games: AUC 0.963-0.998 vs 0.916-0.982 for the default evidence. Largest weight: "ball
+  seen" (−3.8, i.e. seen means alive).
+- `check_bar` on BAR-ATH:
+  - stoppages 106 -> **82**;
+  - set pieces with a stoppage 96.6 -> **84.5 %** (throw-ins 26/26 -> 20/26);
+  - dead share 40.4 -> 33.6 %;
+  - possessions 268 -> 274.
+- Clear failure of check 1: the benches were not run.
+
+*Codex's critique (consulta-06) and our answers:*
+1. *The rejection follows the rule.* Agreed.
+2. *Our reading (BAR-ATH sees the ball in part of its stoppages, so hiding it in all dead time
+   taught "seen = alive") is plausible but not proven by the aggregates; the throw-ins could also
+   be the rules' fault.* True. It stays a hypothesis.
+3. *The model may have learnt something specific to the providers or their labels.* Possible,
+   and this is the second learnt dead-ball model to fail the same way (#7). The pattern is
+   clear: what predicts stoppages on other providers' tracking does not carry over to ours.
+4. *Do not tune a hidden-ball fraction against BAR-ATH's aggregates: that calibrates against our
+   own gate.* Agreed. Not done, and the line is closed.
+5. *If anything, work by type of stoppage (throw-ins).* Noted in the queue. It is not tried here:
+   there is no labelled throw-in timing on our match, and the bench does not imitate our
+   stoppages.
+
+*What we learn (#13):*
+- Learnt dead-ball models win on the benches and lose stoppages on BAR-ATH, twice now.
+- The default speed model, fitted on our own match with rule-made pseudo-labels, transfers by
+  construction. Only its weight was worth tuning (#9).
+- The dead-ball line is closed for this deadline.
+- The tool `degrade.hide_dead_ball` stays: it makes the IDSSE bench's ball visibility closer to
+  ours. But hiding ALL dead time is too strong a model of our tracking.
