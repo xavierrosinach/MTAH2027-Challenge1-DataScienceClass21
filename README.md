@@ -22,6 +22,7 @@ src/possession/
   dead.py                modelo aprendido de balón muerto (probado y descartado, apagado)
 models/                  pesos de los modelos aprendidos (JSON; run.py no necesita entrenar nada)
 validation/              banco de validación en otros partidos (Metrica) y comprobaciones sin etiquetas
+xavier/                  pruebas de Xavier: reglas nuevas de balón parado (prova-xavier), ver xavier/README.md
 docs/technical_report.md documento técnico (entregable)
 PROGRESS.md              panel de progreso: mejor versión, experimentos, cola de ideas, avisos
 EXPERIMENTS.md           registro detallado de cada experimento y de cómo se decide

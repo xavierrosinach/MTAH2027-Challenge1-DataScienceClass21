@@ -1,0 +1,10 @@
+bench suite: 3 games, conditions ['degraded+coarseGT']  (451 s)
+
+                    spellF1           macroF1              poss spellF1 macroF1
+condition degraded+coarseGT degraded+coarseGT degraded+coarseGT    MEAN    MEAN
+model                                                                          
+f2                   0.6950            0.8677          256.7500  0.6950  0.8677
+final                0.6772            0.8602          257.7500  0.6772  0.8602
+base                 0.6518            0.8428          254.1667  0.6518  0.8428
+
+GT possessions per game: degraded+coarseGT 292

@@ -1,0 +1,10 @@
+bench suite: 3 games, conditions ['light']  (482 s)
+
+          spellF1 macroF1     poss spellF1 macroF1
+condition   light   light    light    MEAN    MEAN
+model                                             
+f2         0.6883  0.9038 266.0000  0.6883  0.9038
+final      0.6702  0.8926 265.0000  0.6702  0.8926
+base       0.6436  0.8709 261.2500  0.6436  0.8709
+
+GT possessions per game: light 384

@@ -1,0 +1,10 @@
+bench suite: 3 games, conditions ['degraded+tags']  (452 s)
+
+                spellF1       macroF1          poss spellF1 macroF1
+condition degraded+tags degraded+tags degraded+tags    MEAN    MEAN
+model                                                              
+f2               0.6267        0.8768      257.0833  0.6267  0.8768
+final            0.6151        0.8726      260.6667  0.6151  0.8726
+base             0.6089        0.8669      260.7500  0.6089  0.8669
+
+GT possessions per game: degraded+tags 384

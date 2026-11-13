@@ -21,6 +21,13 @@ context:
     depth_m: 17.0                      # un slot es portero si pasa casi toda la parte a < 17 m de una línea de gol...
     share: 0.7                         # ...en más del 70 % de sus frames; su equipo = el que defiende esa portería
 
+  occlusion:                           # jugador que el tracking pierde al solaparse con un rival: sigue ahí
+    enabled: false                     # mantenerlo como "fantasma" pegado a ese rival (SIN VALIDAR en el banco)
+    radius_m: 2.0                      # desaparece con un rival a < 2 m -> está tapado por él
+    max_s: 10                          # el fantasma dura como máximo 10 s
+    release_m: 1.5                     # termina si se ve a un compañero a < 1,5 m del fantasma (vuelve a estar detectado)
+    reborn_m: 5.0                      #   o si nace un slot de su equipo a < 5 m (el tracker lo ha recuperado)
+
   pseudo:                              # reglas que crean las etiquetas de entrenamiento del modelo de balón muerto
     out_m: 1.0                         # muerto: balón visto a > 1 m fuera del campo
     set_piece_s: 3                     # muerto: primeros 3 s de un tag SET PIECES (el saque llega a los 4-6 s)
@@ -48,10 +55,30 @@ context:
     isolated_max_speed: 8.0            #   rodando o parado (no un pase largo en el aire),
     isolated_s: 2.0                    #   durante 2 s -> nadie lo está jugando
     isolated_llr: 1.5                  #   evidencia de muerto por frame
+    isolated_backdate: false           # true: la parada empieza cuando el balón se queda solo, no 2 s después
+    isolated_max_player_speed: null    #   ...y solo si los jugadores van despacio (media 2 s < X m/s); null = sin condición.
+                                       #   Balón quieto y solo mientras todos corren = balón falso del tracking. Probar 1.6 (SIN VALIDAR en el banco)
     kick_speed: 6.0                    # golpeo: balón visto dentro del campo a > 6 m/s -> el juego (re)empieza
     kick_llr: 2.0                      #   evidencia de vivo por frame del golpeo
     latch_llr: 1.5                     # tras salir el balón, sigue muerto hasta el siguiente golpeo (el saque)...
     latch_max_s: 60                    #   ...como máximo 60 s
+    kick_from_line: false              # true: también cuenta el golpeo de un balón pegado a la línea que entra al campo (córner, banda)
+
+  # --- reglas nuevas (prova-xavier). Apagadas aquí: config.yaml sigue dando el CSV de josep/mejoras ---
+  restart_check:                       # reanudar exige JUEGO: un jugador que mueve un balón parado no reanuda
+    enabled: false                     #   (devolverlo al sitio, el portero que lo coloca para el saque de puerta)
+    rest_speed: 1.0                    # el balón vuelve a estar parado: < 1 m/s...
+    rest_s: 1.0                        #   ...durante 1 s
+    max_s: 6                           # ...antes de 6 s desde el golpeo, sin que lo toque un segundo jugador
+    kicks: true                        # parte 1: ese golpeo no cuenta como saque (no suelta la parada)
+    spells: true                       # parte 2: parada -> un solo jugador toca -> balón solo otra vez = sigue parado
+
+  gap_restart:                         # hueco sin balón que es una parada: el balón reaparece donde se perdió
+    enabled: false                     #   (falta o fuera de juego: se saca desde el sitio)
+    min_s: 3                           # hueco de al menos 3 s
+    max_move_m: 6.0                    # el balón reaparece a < 6 m de donde se dejó de ver
+    max_speed: null                    #   o su velocidad neta en el hueco (distancia / duración) es < X m/s; null = no usar
+    llr: 1.5                           # evidencia de muerto por frame del hueco
 
   goal:                                # gol: muerto desde el último balón cerca de la portería hasta el saque de centro
     zone_depth_m: 16.5                 # zona del tamaño del área delante de cada portería: profundidad
