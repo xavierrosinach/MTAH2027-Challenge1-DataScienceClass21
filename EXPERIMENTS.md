@@ -472,6 +472,27 @@ H 54,891 / A 39,856 / D 64,110 / X 40,462. `check_rules` PASS.
   - re-measure `train_mix` on the 10 games (#11);
   - look for more open tracking data with possession labels (SkillCorner, MIT).
 
+*Error analysis of #10* (`errors.py`, Metrica, `degraded`, seeds 0-3; #6 in brackets):
+- spellF1 0.590 [0.573]. Perfect stoppages 0.647 [0.632]; perfect team 0.859 [0.853].
+- Wrong team on 5.8 % [6.1 %] of live frames with the ball, and on 21.1 % [21.6 %] of the gaps.
+- True possessions found at IoU 0.5:
+
+  | < 2 s | 2-5 s | 5-10 s | 10-20 s | > 20 s |
+  |--:|--:|--:|--:|--:|
+  | 12.0 % [11.1] | 45.2 % [41.5] | 67.8 % [67.0] | 78.1 % [77.6] | 79.6 % [78.7] |
+
+- Missed < 2 s possessions still have no team evidence (−0.10 towards the true team, 42 % of
+  frames right). Missed 2-5 s ones have some (+0.71, 62 %).
+- 256 possessions predicted vs 384 true.
+- Missed: 19.5 % to the rival, 20.4 % merged or wrong edges, 8.3 % called dead.
+- Hand-overs with a predicted one within 1 / 2 / 5 s: 41 / 50 / 60 %.
+- **For the queue:**
+  - the team is still the lever (+0.27 to the team oracle), then stoppages (+0.057);
+  - short possessions are invisible to the features, so more data and robustness pay more than
+    decoder tricks;
+  - for stoppages, the blocker is validation: neither bench imitates our stoppages, because
+    IDSSE's ball never disappears in dead time.
+
 ### #11 control model also trained on `light` copies (`context.control.train_mix`, branch `exp/mezcla`)
 
 - **Change:** the control models are trained on the usual degraded copies plus copies degraded as

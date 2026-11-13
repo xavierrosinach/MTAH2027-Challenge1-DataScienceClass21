@@ -112,7 +112,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 |---|---|---|---|
 | Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #11 `train_mix` sobre v6; luego, ideas de la consulta 02 |
 | Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | **v6 aceptado** (+0.013 en Metrica, +0.019 en 10 partidos): es la mayor ganancia desde v2 | `errors.py` sobre v6; SkillCorner (MIT) sin explorar |
-| Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | margen del oráculo +0.06; falta un banco que imite nuestras paradas (el balón de IDSSE nunca falta) |
+| Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | oráculo +0.057 sobre v6; primero, el banco IDSSE con el balón escondido en tiempo muerto (cola 2b) |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
 | Huecos sin balón | modelo de control en huecos (`gap_weight`) | ruido | interpolar huecos más largos (`interpolate_max_frames`); consulta 02 |
@@ -127,6 +127,10 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
 2. **(en curso) #11 `train_mix`:** entrenar también con copias `light` (Codex 01-4). Si da
    señal, ampliarlo a degradaciones variadas: tasa y duración de huecos, ruido y distancia
    balón-jugador por separado (Codex 02-1, +0.005 a +0.02 según Codex).
+2b. **Banco IDSSE que esconda el balón en tiempo muerto** (herramienta, no cambia el CSV). En
+   BAR-ATH y en Metrica el balón casi nunca se ve con el juego parado; en IDSSE se ve siempre. Con
+   esto, los cambios de balón muerto (oráculo +0.057 sobre v6) se podrían validar con dos
+   proveedores. Sale de `errors.py` sobre v6.
 3. **Interpolar huecos de balón más largos** (`ball_gaps.interpolate_max_frames` 12 → 25 / 50).
    Más frames con balón para el modelo, sin reentrenar. Es un barrido barato.
 4. **Coste de cambio H↔A según la evidencia local de cambio** (Codex 02-3) o confianza según la
