@@ -1124,3 +1124,24 @@ Pre-registered 13-nov, before any further measurement, as for #16.
 - Limitation, recorded: with the ball missing on ~41 % of our frames, the rule can create false
   stoppages that replace missed ones. The aggregate caps catch an excess, not errors that cancel
   out.
+
+### #28 minimum stoppage of 3 s on top of #27 (only if #27 is accepted; branch `exp/x28`)
+
+Pre-registered 13-nov, before #27 is decided and before any measurement of this combination.
+Codex (consulta-15) found a retry legitimate as a new hypothesis, if the counting is fixed
+beforehand.
+- **Change:** `transition_cost.min_dead_s` 1 -> 3, on top of `josep/mejoras` with #27.
+- **New reason:** #27 turns long ball gaps into stoppages: on BAR-ATH, 106 -> 130 stoppages, at the
+  cap. The minimum length removes the spurious short ones, which is #22's purpose. On the old
+  base it lost a real goal-kick stoppage (#22).
+- **Rule, fixed now:**
+  - Metrica bench on seeds 8-11 and on seeds 12-15, both new for this comparison, each with the
+    usual rule (up under each of the 4 conditions, >= 7/12 cells, macroF1 not down, game 3 not
+    down).
+  - `check_bar`:
+    - the share of Smart Tagging set pieces with a stoppage not below the current version;
+    - stoppages between 92 and 130, the band of real matches with tracking-derived ground truth
+      plus our cap. Not "not below current", because removing short stoppages is the change's
+      purpose;
+    - dead share <= 50 %; 240-300 possessions.
+  - Any failure -> rejected (no doubtful round).
