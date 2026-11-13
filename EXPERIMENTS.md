@@ -833,3 +833,12 @@ Pre-registered 13-nov 14:35, before measuring. Runs after #17.
   worth using, a little.
 - Rules can be fixed honestly: when a check is mis-specified, apply it, record it, correct it
   for what follows, and confirm on new data, without reopening what it rejected.
+
+*Error analysis of #16* (`errors.py`, Metrica, `degraded`, seeds 0-3; v6 in brackets):
+- spellF1 0.594 [0.590]; perfect stoppages 0.650, perfect team 0.859.
+- Wrong team in ball gaps 19.7 % [21.1 %], with the ball seen 5.8 % [5.8 %].
+- True possessions found at IoU 0.5: 12.0 / 45.6 / 68.7 / 78.6 / 80.2 % by duration (< 2 s ...
+  > 20 s).
+
+The gap evidence did what it was meant to do and nothing else. Short possessions stay out of
+reach.

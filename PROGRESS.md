@@ -41,6 +41,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
+| #17 peso de la evidencia de equipo de v6 (`control.weight` 1.5 / 2) | `exp/peso-control` | coordinador (`C:/MTAH2027/wt-peso-control`) | barrido en Metrica, semillas 0-3, en marcha. Después, #18 (`shape.weight`) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
