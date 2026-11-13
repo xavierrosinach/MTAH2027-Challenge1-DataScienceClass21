@@ -729,3 +729,19 @@ correction comes after #15 was registered, #15 keeps ">= 106".
 - It moves one stoppage edge on BAR-ATH.
 - The gate was written for another kind of change. The lesson is about rules: a check that is
   right for one family of changes can be too tight for another, so write it per family.
+
+### #16 `gap_weight` 0.1, confirmatory only (branch `exp/gap01`)
+
+Pre-registered 13-nov, before any new measurement, as Codex advised in consulta-07.
+- **Change:** `context.control.gap_weight` 0 -> 0.1 (the team evidence of the learnt gap model
+  in frames without the ball). Measured against `josep/mejoras` as it is when #15 closes; if
+  #15 is accepted, the gap model is v9's.
+- **The earlier result does not count.** 0.1 was seen in #14's sweep (seeds 0-3: +0.0031) and
+  came second; 0.3 failed `check_bar` by one stoppage. To avoid selecting 0.1 after the fact, the
+  decision rests only on new measurements:
+  - Metrica bench on seeds **8-11** (never run for this setting), with the usual rule: mean
+    spellF1 up under each of the 4 conditions, >= 7/12 cells, macroF1 not down, game 3 not down;
+  - and seeds **12-15** with the same rule, since doubtful has no further round here;
+  - `check_bar` with the corrected threshold for non-dead-ball changes: 240-300 possessions,
+    stoppages within ±2 of the current version, set pieces with a stoppage not below it.
+- **Outcomes:** all pass -> accepted; anything fails -> rejected (no doubtful round).
