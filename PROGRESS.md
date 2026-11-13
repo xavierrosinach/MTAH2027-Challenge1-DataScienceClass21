@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 (tarde)
+**Actualizado:** 2026-11-13 17:40
 
 **Calendario:**
 
@@ -37,10 +37,34 @@ Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking de
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
 oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 paradas.
 
+## Resumen a 13-nov 17:40 (para la decisión del 16)
+
+- **Versión recomendada:** `josep/mejoras` e54da9e y siguientes (solo documentación después).
+  Es v6 + `gap_weight` 0.1, con el CSV `1077ece7…`, reproducible desde un worktree limpio.
+- **Lo que ha aportado cada paso** (banco de Metrica; la nota real puede ser otra):
+
+  | paso | banco |
+  |---|---|
+  | main de Xavier | 0.455 |
+  | v4 (12-nov) | 0.613 |
+  | `dead_weight` 0.3 | 0.619 |
+  | v6, 10 partidos | 0.629 (semillas 4-7) |
+  | huecos | 0.636 (semillas 12-15) |
+
+- **Experimentos del 12 y 13 de noviembre:** 13 cerrados con su regla escrita antes de medir
+  (#8-#20). 4 aceptados (#9, #10, #16 y la herramienta IDSSE) y el resto descartados con
+  etiqueta. Codex criticó cada cierre.
+- **Cola:** no queda ningún cambio de modelo con ganancia esperada razonable que se pueda validar
+  antes de la congelación (Codex 13 está de acuerdo). Cada idea tiene su prueba o su motivo escrito.
+- **Hasta la congelación** (14-nov 20:00):
+  - vigilar el trabajo de Xavi y medirlo en el banco si lo sube;
+  - mantener la documentación al día.
+
 ## En curso
 
 | línea | rama | agente | estado |
 |---|---|---|---|
+| Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi/*`) | — | coordinador | revisión periódica; sin novedades a las 17:11 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -240,5 +264,8 @@ aprobación y ningún agente puede escribirlo.
   - llamar a Python a través de una variable de PowerShell (`& $py`): se usó la ruta explícita;
   - un mensaje de commit que nombraba el fichero de decisiones: el commit no lo tocaba y se
     repitió sin nombrarlo.
+- **Documento técnico, añadido el 13-nov:** §2.4 dice ahora que un modelo externo (OpenAI Codex)
+  criticó cada decisión solo con el método y números agregados, nunca con datos del partido.
+  Decide si se queda, junto con lo de abajo.
 - **Documento técnico:** decidir si se mantienen la línea sobre el asistente de IA y la del desliz
   con la tabla pública (§2.4), y añadir los nombres de los 4 miembros.
