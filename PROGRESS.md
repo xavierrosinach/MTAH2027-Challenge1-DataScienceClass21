@@ -41,7 +41,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #20 red también para los frames sin balón (`gap_model_type: mlp`) | `exp/gap-red` | coordinador (`C:/MTAH2027/wt-gap-red`) | entrenando v11; regla 1: pérdida logarítmica en los huecos, red frente a lineal |
+| #20 red también para los frames sin balón (`gap_model_type: mlp`) | `exp/gap-red` | coordinador (`C:/MTAH2027/wt-gap-red`) | regla 1 superada: la red de huecos gana al lineal en los 10 partidos no vistos (Metrica 0.38-0.54 frente a 0.57-0.65). Banco de Metrica, semillas 0-3, en marcha |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -126,6 +126,7 @@ nota pública no cuenta para nada.
 | fecha de la revisión | `origin/main` | ramas `origin/xavi/*` | novedades |
 |---|---|---|---|
 | 13-nov tarde | 80ad34c (11-nov, ya integrado en `josep/mejoras` el 12-nov) | ninguna | nada nuevo |
+| 13-nov 17:11 | 80ad34c | ninguna | nada nuevo |
 
 - **13-nov:** Josep cuenta que Xavi tiene un "0,7 de F1" sin subir. No sabemos sobre qué lo ha
   medido; probablemente sobre los 5 minutos públicos, que no deciden nada (R2). No cuenta hasta
