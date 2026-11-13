@@ -74,14 +74,14 @@ context:
 
   control:                             # modelo aprendido de quién controla el balón (src/possession/control.py)
     enabled: true                      # entrenado en OTROS partidos (validation/train_control.py); EXPERIMENTS.md #3
-    model: models/control_v6_mlp.json  # pesos: 10 partidos ajenos (3 Metrica + 7 IDSSE), tracking degradado; nunca BAR-ATH (EXPERIMENTS.md #10)
+    model: models/control_v8_mlp.json  # DESCARTADO #11: v6 + train_mix [light]
     features: [base, motion]           # grupos de rasgos (control.py): base + movimiento de los jugadores
                                        #   respecto al balón (EXPERIMENTS.md #4); long y touch, descartados
     model_type: mlp                    # `model` es una red antisimétrica (1 capa oculta) para frames con balón
     mlp: {hidden: 16, epochs: 4, l2: 0.001, lr: 0.002, batch: 2048, seed: 0}   # elegido por log-loss en partido no visto
-    ensemble: [models/control_v6_lin.json]  # se promedia con un logit lineal (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
+    ensemble: [models/control_v8_lin.json]  # se promedia con un logit lineal (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
     weight_power: 0.25                 # entrenamiento: cada frame pesa (duración de su posesión)^-0.25 (EXPERIMENTS.md #6)
-    train_mix: []                      # entrenamiento: copias extra degradadas como estas condiciones del banco (p. ej. [light])
+    train_mix: [light]                   # entrenamiento: copias extra degradadas como estas condiciones del banco (p. ej. [light])
     replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
     weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
     gap_weight: 0.0                    # peso por frame sin balón (solo la forma de los equipos)
