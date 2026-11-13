@@ -118,6 +118,21 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | huecos | `descartado/huecos/forma` | peso de la forma en los huecos 0.05 / 0.2 | 0.2: +0.0010 dudoso; semillas 8-11 −0.0003 | descartada: ruido |
 | 13-nov | control | `descartado/control/red-32` | red de 32 neuronas con 10 partidos | pérdida logarítmica de la red 0.2132 frente a 0.2120 | descartada en la regla 1, sin banco |
 
+## Trabajo de Xavi
+
+Se revisa en cada ciclo (`git fetch origin`). Su versión se mide en el banco cuando la suba; su
+nota pública no cuenta para nada.
+
+| fecha de la revisión | `origin/main` | ramas `origin/xavi/*` | novedades |
+|---|---|---|---|
+| 13-nov tarde | 80ad34c (11-nov, ya integrado en `josep/mejoras` el 12-nov) | ninguna | nada nuevo |
+
+- **13-nov:** Josep cuenta que Xavi tiene un "0,7 de F1" sin subir. No sabemos sobre qué lo ha
+  medido; probablemente sobre los 5 minutos públicos, que no deciden nada (R2). No cuenta hasta
+  medirlo en el banco. Cuando lo suba:
+  - se mide su versión entera en `C:\MTAH2027\wt-xavi`, con prioridad sobre la cola;
+  - se separan sus ideas, cada una como un experimento de un solo cambio.
+
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
 | línea | probado | resultado | siguiente |
