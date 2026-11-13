@@ -39,6 +39,7 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 | línea | rama | agente | estado |
 |---|---|---|---|
 | #12 interpolar huecos de balón más largos (`interpolate_max_frames` 25 / 50) | `exp/interp` | coordinador (`C:/MTAH2027/wt-interp`) | barrido en Metrica, semillas 0-3 |
+| Más datos: SkillCorner opendata (10 partidos de la A-League, MIT, tracking de broadcast con posesión por algoritmo), fase 1: datos y GT | `exp/skillcorner` | worker Claude (`C:/MTAH2027/wt-skillcorner`) | desde 13-nov 16:50: licencia, descarga, cargador y agregados, sin procesos pesados |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -152,7 +153,7 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
    - calibrar la resolución temporal del GT (02-2): ya lo cubre la condición coarseGT;
    - enmascarar rasgos del balón en el entrenamiento (02-5): el modelo de control solo se usa con
      el balón visto, y los huecos van por el modelo de forma.
-10. **SkillCorner opendata** (MIT, tracking de broadcast). Primero hay que ver si trae etiquetas
+10. **(en curso, fase 1) SkillCorner opendata** (MIT, tracking de broadcast). Trae posesión por frame (algoritmo) y fases de juego. Primero hay que ver si trae etiquetas
     de posesión; solo si sobra tiempo.
 
 ## Incidencias de reglas
