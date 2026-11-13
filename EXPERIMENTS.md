@@ -108,6 +108,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `aceptado/xavier/saque-linea` | 23 | a kick from a ball on the line restarts play (Xavier) |
 | `descartado/xavier/hueco-parada-15m` | 21 | a ball gap that is a stoppage, radius 15 m (Xavier; 136 stoppages on BAR-ATH > cap 130) |
 | `aceptado/xavier/hueco-parada-10m` | 27 | a ball gap that is a stoppage, radius 10 m, confirmed on new seeds (Xavier; current) |
+| `descartado/xavier/parada-minima-sobre-huecos` | 28 | minimum stoppage 3 s on top of #27 (a goal kick loses its stoppage) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1200,3 +1201,26 @@ real matches we have.
 - It fits the oracle analysis, where stoppages were worth +0.057.
 - It transfers to a second provider with tracking ground truth.
 - The idea came from a teammate; its radius was set by the bench and confirmed on new seeds.
+
+**Result of #28 (13-nov), REJECTED: tag `descartado/xavier/parada-minima-sobre-huecos`.**
+- Seeds 8-11: +0.0057 (se 0.0008); the 4 conditions +0.004 to +0.008; 12/12 cells; macroF1
+  +0.0003; game 3 +0.011.
+- `check_bar`:
+  - stoppages 130 -> 124 (inside the 92-130 band);
+  - dead share 45.3 %;
+  - possessions 278;
+  - **set pieces with a stoppage 96.6 -> 94.8 %**: the same goal kick as in #22 loses its stoppage.
+- Any failure rejects, so seeds 12-15 were not run.
+
+*Codex (consulta-19):*
+- The rejection follows the rule.
+- The repeated goal kick deserves a look. Exempting set-piece tags from the minimum would be an
+  exception motivated by the result, i.e. a search after the fact, unless registered as a new
+  candidate.
+- Not done, with this reason: the exemption would be designed to pass the very check that failed,
+  and the bench has synthetic set-piece tags in only one condition, so it could not be validated
+  independently.
+
+*What we learn (#22 and #28):* our match has at least one real stoppage shorter than 3 s, as our
+labeller sees it (a goal kick; we detect its stoppage late). A minimum length costs exactly
+those.
