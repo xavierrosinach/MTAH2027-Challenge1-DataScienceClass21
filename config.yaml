@@ -22,7 +22,7 @@ context:
     share: 0.7                         # ...en más del 70 % de sus frames; su equipo = el que defiende esa portería
 
   occlusion:                           # jugador que el tracking pierde al solaparse con un rival: sigue ahí
-    enabled: false                     # mantenerlo como "fantasma" pegado a ese rival (SIN VALIDAR en el banco)
+    enabled: true                      # #26: mantenerlo como "fantasma" pegado a ese rival
     radius_m: 2.0                      # desaparece con un rival a < 2 m -> está tapado por él
     max_s: 10                          # el fantasma dura como máximo 10 s
     release_m: 1.5                     # termina si se ve a un compañero a < 1,5 m del fantasma (vuelve a estar detectado)
