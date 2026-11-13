@@ -110,6 +110,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `aceptado/xavier/hueco-parada-10m` | 27 | a ball gap that is a stoppage, radius 10 m, confirmed on new seeds (Xavier; current) |
 | `descartado/xavier/parada-minima-sobre-huecos` | 28 | minimum stoppage 3 s on top of #27 (a goal kick loses its stoppage) |
 | `descartado/xavier/saque-falso` | 24 | a kick that leaves the ball at rest within 6 s without a second player does not restart (Xavier; noise) |
+| `descartado/xavier/fantasma` | 26 | a player lost behind a rival kept as a ghost (Xavier; noise, not simulated by the bench) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -1248,3 +1249,8 @@ those.
   mean, within one standard error and with mixed signs, is inconclusive. That is exactly the
   method's definition of doubtful (difference below one standard error, signs differ between
   conditions). Correction: doubtful, so one round on seeds 8-11 decides.
+- Seeds 8-11: −0.0001 (se 0.0005); light −0.0001, degraded −0.0002, +tags −0.0010, coarseGT
+  +0.0011; 5/12 cells; game 3 −0.0009. Still doubtful: **REJECTED**, tag
+  `descartado/xavier/fantasma`.
+- The bench cannot simulate occlusions (its degradation cuts tracks at random), so this idea
+  cannot be validated here.

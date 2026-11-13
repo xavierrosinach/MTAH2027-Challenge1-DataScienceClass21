@@ -69,7 +69,7 @@ oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier: #26 jugador tapado (`occlusion`) | `exp/x26` | coordinador (`C:/MTAH2027/wt-x26`) | banco en Metrica, semillas 0-3, en marcha. #24 descartada. Luego #25 |
+| Ideas de Xavier: #25 balón falso (`isolated_max_player_speed` 1.5, valor fijado por nosotros) | `exp/x25` | coordinador (`C:/MTAH2027/wt-x25`) | semillas 0-3: +0.0010, 8/12; semillas 4-7 en marcha. #26 descartada |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -153,6 +153,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | xavier | `aceptado/xavier/hueco-parada-10m` | hueco que es parada, radio 10 m (idea de Xavier, confirmación) | semillas 8-11 +0.027, 12-15 +0.029, IDSSE escondido +0.024; check_bar 130 paradas | **aceptada (actual)** |
 | 13-nov | xavier | `descartado/xavier/parada-minima-sobre-huecos` | parada mínima de 3 s encima de #27 | +0.0057 (semillas 8-11, 12/12) | descartada: el mismo saque de puerta pierde su parada (96,6 -> 94,8 %) |
 | 13-nov | xavier | `descartado/xavier/saque-falso` | saque falso (idea de Xavier) | +0.0005 / +0.0002 / −0.0000 (semillas 0-3, 4-7 y 8-11) | descartada: dudosa dos veces, casi nunca se activa |
+| 13-nov | xavier | `descartado/xavier/fantasma` | jugador tapado como fantasma (idea de Xavier) | +0.0011 / −0.0006 / −0.0001 (semillas 0-3, 4-7 y 8-11) | descartada: dudosa dos veces; el banco no simula oclusiones |
 
 ## Trabajo de Xavi
 
