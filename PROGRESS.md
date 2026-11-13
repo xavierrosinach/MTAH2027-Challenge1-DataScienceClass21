@@ -38,7 +38,6 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #11 `train_mix [light]` (idea 4 de Codex) | `exp/mezcla` | coordinador (`C:\MTAH2027\wt-mezcla`) | v6 ha entrado, así que se reentrena `train_mix` con los 10 partidos y se mide contra v6 (EXPERIMENTS #11). Antes, `errors.py` sobre v6 |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -105,12 +104,13 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | reglas | (barridos, sin etiqueta) | `pass_llr`, `kick_team_llr`, `from_dead` | ±0.002 | sin efecto (EXPERIMENTS #9) |
 | 13-nov | muerto | (barridos, sin etiqueta) | `dead_llr_clip`, `inside_llr`, `out_llr`, `isolated_llr`, `latch_llr`, `kick_llr` sobre la versión actual | ±0.001 | sin efecto; quitar `inside_llr` cuesta −0.020 (EXPERIMENTS #9) |
 | 13-nov | datos | `aceptado/datos/v6-idsse` | modelo de control entrenado con 10 partidos (3 Metrica + 7 IDSSE) | 0.629 en semillas 4-7 (+0.013, error típico 0.002); 10 partidos +0.019 (39/40 celdas) | **aceptada (actual)** |
+| 13-nov | control | `descartado/control/train-mix-light` | v6 entrenado también con copias `light` | +0.0027, pero coarseGT −0.0053 | descartada: corta más fino (+6 posesiones) |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
 | línea | probado | resultado | siguiente |
 |---|---|---|---|
-| Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #11 `train_mix` sobre v6; luego, ideas de la consulta 02 |
+| Modelo de control (quién tiene el balón) | v1-v4 (modelo aprendido, movimiento, red, peso por posesión); rasgos largos, de toques y de 0,5 s; la red sola; 5 semillas | 4 aceptados; el resto, ruido | #11 `train_mix` descartado (corta más fino); siguiente: evidencia mejor con el mismo corte (consulta 02-3, 01-3) |
 | Datos de otros partidos | Metrica (3) e IDSSE (7) integrados | **v6 aceptado** (+0.013 en Metrica, +0.019 en 10 partidos): es la mayor ganancia desde v2 | `errors.py` sobre v6; SkillCorner (MIT) sin explorar |
 | Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | oráculo +0.057 sobre v6; primero, el banco IDSSE con el balón escondido en tiempo muerto (cola 2b) |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
@@ -124,10 +124,12 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
 (`C:/consultas-ia/consulta-NN-*.md`). Cada idea tiene una prueba o un motivo escrito.
 
 1. **(hecho) #10 v6:** modelo entrenado con 10 partidos (Metrica + IDSSE). Aceptado el 13-nov.
-2. **(en curso) #11 `train_mix`:** entrenar también con copias `light` (Codex 01-4). Si da
-   señal, ampliarlo a degradaciones variadas: tasa y duración de huecos, ruido y distancia
-   balón-jugador por separado (Codex 02-1, +0.005 a +0.02 según Codex).
-2b. **Banco IDSSE que esconda el balón en tiempo muerto** (herramienta, no cambia el CSV). En
+2. **(hecho, descartado) #11 `train_mix`:** entrenar también con copias `light` (Codex 01-4). Corta
+   más fino y pierde en coarseGT. Motivo para no probar más dosis ni degradaciones variadas (Codex
+   02-1): solo moverían el mismo mando, el de cuán fino cortar.
+2b. **(hecho, herramienta) Banco IDSSE con el balón escondido en tiempo muerto**
+   (`validation/bench_dfl_dead.yaml`): ausencia del balón 49,8 % (BAR-ATH 40,7 %), huecos que
+   empiezan en una línea 28,6 % (31,8 %). En
    BAR-ATH y en Metrica el balón casi nunca se ve con el juego parado; en IDSSE se ve siempre. Con
    esto, los cambios de balón muerto (oráculo +0.057 sobre v6) se podrían validar con dos
    proveedores. Sale de `errors.py` sobre v6.

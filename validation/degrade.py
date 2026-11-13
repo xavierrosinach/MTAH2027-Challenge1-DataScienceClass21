@@ -10,6 +10,8 @@ the ball missing on ~41 % of graded frames in long gaps.
 - ball_live_gaps: extra ball gaps while the ball is alive (the Metrica ball is already missing
   during most stoppages, like ours); placed at random, at a rate per minute of live play.
 - noise_m: Gaussian noise (m) on every position.
+- hide_dead_ball: no ball while the ground truth says dead (for providers whose tracking keeps
+  the ball through stoppages, as IDSSE; validation/bench_dfl_dead.yaml).
 - ball_noise: smooth (time-correlated) noise on the ball. The Metrica ball sits on the feet of the
   player who has it (median distance to the nearest player 0.3 m); the BAR-ATH ball does not
   (1.9 m), so without this the bench rewards trusting tiny distances.
@@ -88,6 +90,10 @@ def degrade(tracking, gt_labels, cfg, seed):
     bn = cfg.get("ball_noise") or {}
     if bn.get("sigma_m", 0) > 0:
         ball = ball + smooth_noise(rng, len(ball), bn["sigma_m"], bn["corr_s"]) / scale
+    if cfg.get("hide_dead_ball", False):
+        # IDSSE's optical tracking sees the ball through every stoppage; Metrica's (like ours)
+        # loses it there. No random draw, so the other steps get the same numbers as without it.
+        ball = np.where((np.asarray(gt_labels) == "D")[:, None], np.nan, ball)
     p = cfg.get("players") or {}
     if p.get("enabled", False):
         players, team = fragment_players(players, team, rng, p["fragment_median_s"],

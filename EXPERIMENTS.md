@@ -94,6 +94,7 @@ On GitHub the tags are under "Tags". Locally: `git tag -l "descartado/*" -n1`.
 | `aceptado/muerto/dead-weight-03` | 9 | `dead_weight` 0.5 -> 0.3 |
 | `descartado/muerto/to-dead-20` | 9 | `to_dead` 10 -> 20 (fewer stoppages on BAR-ATH) |
 | `aceptado/datos/v6-idsse` | 10 | control model trained on 10 games, IDSSE added (current) |
+| `descartado/control/train-mix-light` | 11 | also trained on `light` copies (cuts finer, loses coarseGT) |
 
 Not tagged: `ball.weight`, `passes.pass_llr` and "ignore proximity when the ball flies".
 These were first-bench trials whose code or settings were not kept; the table below gives their
@@ -507,3 +508,54 @@ H 54,891 / A 39,856 / D 64,110 / X 40,462. `check_rules` PASS.
     Metrica bench seeds 0-3, all 4 conditions up, at least 7/12 cells, macroF1 not down, game 3
     looked at; then seeds 4-7 with the same rule, `check_control` (relative) and `check_bar` as
     in (e).
+
+**Result (13-nov), REJECTED: tag `descartado/control/train-mix-light`.**
+- Retrained on the 10 games: models `control_v8_*`, trained with `--workers 1` because with 2 the
+  run was killed for lack of memory.
+- Held-out log-loss of the network: Metrica 0.167 / 0.162 / 0.174 (v6 0.162 / 0.159 / 0.172);
+  IDSSE about the same.
+- Metrica bench, seeds 0-3, vs v6 (0.6292): 0.6318, +0.0027 (se 0.0012, 62 % of runs better).
+  - By condition: light +0.0067, degraded +0.0046, +tags +0.0047, **coarseGT −0.0053** (se
+    0.0019, 25 % better; all 3 coarseGT cells negative).
+  - 9/12 cells, macroF1 +0.0006.
+  - +6 predicted possessions per game (265 vs 259).
+- Rule (b) fails clearly (coarseGT down), so the 10-game bench was not run.
+
+*Codex's critique (consulta-04) and our answers:*
+1. *No flaw in rejecting it.* Agreed.
+2. *"Cuts finer" is plausible but not proven: the boundaries' calibration could change, or it
+   could fit bench A's style.* True: we did not separate these, and for the decision we do not
+   need to. Whatever the mechanism, the effect on the scores is the known pattern: more
+   possessions, a gain only with the fine ground truth.
+3. *A smaller dose of light copies only with a rule fixed beforehand that coarseGT does not drop;
+   otherwise close the line.* Closed. A dose is one more "how finely to cut" knob, like
+   `weight_power` 0.5 and `team_switch` 13: the bench can only tell us that it trades the fine
+   ground truth against the coarse one.
+
+*What we learn (#11):*
+- This is the fourth change whose gain comes from more possessions and is paid for under
+  coarseGT: stronger weighting, cheaper hand-overs, and now cleaner training copies.
+- The current setting sits where the fine and coarse ground truths balance. Any further gain has
+  to come from better evidence at the same cut, not from cutting finer.
+- Training on cleaner copies makes the model more confident in short touches. That is exactly
+  what moves the cut.
+
+### #12 interpolate longer ball gaps (`ball_gaps.interpolate_max_frames`, branch `exp/interp`)
+
+Pre-registered 13-nov, before measuring.
+- **Change:** `ball_gaps.interpolate_max_frames` 12 (0.5 s) -> 25 or 50. Ball gaps up to that
+  length are filled by linear interpolation, at inference only; the models are not retrained.
+  Nothing else changes.
+- **Hypothesis:** about 41 % of our frames miss the ball, many in short gaps inside live play.
+  With the ball interpolated, the learnt team model (used only where the ball is "seen") gives
+  evidence on more frames. Interpolated positions between two touches lie on the pass line, so
+  they should not mislead.
+- **Rule (the usual one):**
+  - A sweep on the Metrica bench, seeds 0-3, with values 25 and 50. A value is a candidate if its
+    mean spellF1 is up under each of the 4 conditions, at least 7 of the 12 cells are better,
+    macroF1 is not down and game 3 is not down. If both pass, the higher mean is the candidate.
+  - The candidate needs the same on seeds 4-7.
+  - `check_control` (relative: BAR-ATH vs bench as with v6).
+  - `check_bar` (240-300 possessions; stoppages and set pieces with a stoppage not below the
+    current 106 and 96.6 %).
+  - Doubtful: seeds 8-11.
