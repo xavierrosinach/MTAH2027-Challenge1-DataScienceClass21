@@ -74,9 +74,9 @@ context:
     spells: true                       # parte 2: parada -> un solo jugador toca -> balón solo otra vez = sigue parado
 
   gap_restart:                         # hueco sin balón que es una parada: el balón reaparece donde se perdió
-    enabled: false                     #   (falta o fuera de juego: se saca desde el sitio)
+    enabled: true                      #   #27 (falta o fuera de juego: se saca desde el sitio)
     min_s: 3                           # hueco de al menos 3 s
-    max_move_m: 6.0                    # el balón reaparece a < 6 m de donde se dejó de ver
+    max_move_m: 10.0                   # #27: el balón reaparece a < 10 m de donde se dejó de ver (banco)
     max_speed: null                    #   o su velocidad neta en el hueco (distancia / duración) es < X m/s; null = no usar
     llr: 1.5                           # evidencia de muerto por frame del hueco
 
