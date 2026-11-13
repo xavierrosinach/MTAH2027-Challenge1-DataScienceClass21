@@ -224,6 +224,14 @@ Tried and dropped, with the bench numbers in EXPERIMENTS.md:
 - **A larger network (32 hidden units) on 10 matches.** Its held-out log-loss was worse.
 - **Re-weighting the team-shape evidence in ball gaps, and a network for the frames without the
   ball.** Both were noise on the bench.
+- **Four other rules proposed by the teammate:**
+  - a minimum stoppage of 3 s, tried alone and on top of the gap rule: on our match it removed a
+    goal kick's real stoppage;
+  - a ball gap that is a stoppage with a 15 m radius: 136 stoppages on our match, above the
+    plausibility cap of 130;
+  - an isolated still ball while players run is not a stoppage: the same goal kick lost its
+    stoppage;
+  - keeping occluded players, and requiring play after a restart: noise on the bench.
 - **A dead-ball model learnt on the Metrica games.** It gave +0.017 on the bench but did not
   transfer to our match: fewer stoppages (104 → 93) and fewer Smart Tagging set pieces with a
   stoppage (96.6 → 91.4 %). The code is kept, switched off (`context.dead_model`).
@@ -404,6 +412,11 @@ Submission file: H 52,362 / A 34,398 / D 72,097 / X 40,462 frames. SHA256
   - a degradation that reproduces our stoppages (when the ball is seen or lost in dead time), so
     that dead-ball changes can be validated off our match;
   - evidence for short possessions: on the bench, the features do not see the < 2 s ones at all.
+- **Our match has many stoppages now.** With the gap rule, 130 stoppages and 45 % dead time:
+  plausible (the IDSSE matches have 41-52 % dead), but above the 92-113 stoppages of the real
+  matches we have. On the bench the gap rule was right, and on a second provider with tracking
+  ground truth it improved stoppage quality too. Still, on our match some of the added stoppages
+  may be live ball gaps.
 
 ## 8. Reproduction
 

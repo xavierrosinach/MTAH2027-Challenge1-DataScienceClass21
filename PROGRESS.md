@@ -235,10 +235,23 @@ Ordenada por ganancia esperada frente a coste, con las consultas a Codex 01 y 02
      el balón visto, y los huecos van por el modelo de forma.
 10. **(hecho, descartado) #15 SkillCorner:** su GT es más grueso y enseña a cortar más grueso.
 11. **Consulta 11 a Codex (13-nov):**
-    - #19, red de 32 neuronas: en curso;
-    - #20, red también para los huecos: registrado;
+    - #19, red de 32 neuronas: descartada;
+    - #20, red también para los huecos: descartada;
     - suavizar el equipo a través de los huecos cortos: motivo para no probarlo, porque Viterbi ya
       mantiene el estado a través de los huecos sin evidencia.
+12. **Ideas de Xavier (#21-#28):** cerradas. Aceptadas #23 y #27; descartadas las demás.
+13. **Consulta 23 a Codex (13-nov, caminos finales), con motivo para no probar cada uno:**
+    - Un clasificador para las posesiones < 2 s. Dentro de las que se pierden, la evidencia es
+      −0.12 hacia el equipo verdadero y solo el 43 % de los frames va en la buena dirección. Los
+      rasgos de toques (#4) y de medio segundo (#6) ya fallaron. Un clasificador con las mismas
+      entradas no puede recuperar información que no está.
+    - Un modelo de transición en los huecos: Viterbi ya lo es. La evidencia de los huecos (#16) ya
+      está dentro, y la red de huecos (#20) fue ruido.
+    - Auditar las posesiones fusionadas: Codex le da ganancia baja y pide revisar muestras antes
+      de escribir ninguna regla; no da tiempo a validarla bien.
+
+    No queda ningún cambio de modelo con ganancia esperada razonable antes de la congelación. Lo
+    que queda de tiempo va a reproducibilidad, documentación y vigilar a Xavier.
 
 ## Reproducibilidad (R5)
 
