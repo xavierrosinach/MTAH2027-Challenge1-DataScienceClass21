@@ -1145,3 +1145,18 @@ beforehand.
       purpose;
     - dead share <= 50 %; 240-300 possessions.
   - Any failure -> rejected (no doubtful round).
+
+**#27, extra safety check added after Codex's critique (consulta-18), registered before running
+it.** #27 passed every check written for it, but:
+- `check_bar` passed exactly at the cap (130 stoppages);
+- Codex would not accept it until it is validated on matches whose ground truth comes from
+  tracking, looking at stoppage quality and not only the count.
+
+The only such data we have is IDSSE. Added check, stricter only, so it can reject but not
+rescue:
+- the IDSSE bench with the ball hidden in dead time (`validation/bench_dfl_dead.yaml`: tracking
+  ground truth, our kind of ball gaps), seeds 0-3, #27 vs the current version;
+- mean spellF1 not down AND mean macroF1 not down. MacroF1 includes the D class, i.e. the quality
+  of the stoppages;
+- per-game results reported;
+- if either is down, #27 is not accepted.
