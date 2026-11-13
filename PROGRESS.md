@@ -41,6 +41,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
+| #20 red también para los frames sin balón (`gap_model_type: mlp`) | `exp/gap-red` | coordinador (`C:/MTAH2027/wt-gap-red`) | entrenando v11; regla 1: pérdida logarítmica en los huecos, red frente a lineal |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
