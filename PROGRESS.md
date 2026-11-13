@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 17:40
+**Actualizado:** 2026-11-13 (noche)
 
 **Calendario:**
 
@@ -17,7 +17,8 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 
 | | banco spellF1 | banco macroF1 |
 |---|--:|--:|
-| **actual: v6 + evidencia de equipo en los huecos (`gap_weight` 0.1)** (13-nov) | **0.636** ² | **0.857** ² |
+| **actual: + saque desde la línea (#23, idea de Xavier)** (13-nov) | **+0.0023 / +0.0032** ³ | **+0.0008** ³ |
+| v6 + evidencia de equipo en los huecos (`gap_weight` 0.1) (13-nov) | 0.636 ² | 0.857 ² |
 | v6 = modelo entrenado con 10 partidos (Metrica + IDSSE) (13-nov) | 0.629 ¹ | 0.856 ¹ |
 | v4 + `dead_weight` 0.3 (13-nov) | 0.619 | 0.855 |
 | v4 (modelo de control aprendido + movimiento + red + peso por posesión) | 0.613 | 0.852 |
@@ -29,13 +30,14 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 +0.013 (error típico 0.002). En el banco de 10 partidos (Metrica + IDSSE), +0.019.
 ² Semillas 12-15, donde v6 saca 0.634: +0.0019 (en las 8-11, +0.0011). Ganancia pequeña pero
 constante.
+³ Ganancia emparejada sobre la versión anterior: semillas 0-3 (0.6322 -> 0.6345) y 4-7.
 
 Mejora aproximada (las semillas no son las mismas): **+38 %** sobre main y **+97 %** sobre el
 baseline oficial (banco de Metrica).
 
 Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking degradado como el
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
-oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 paradas.
+oficiales. CSV actual: SHA256 `744deca5…`, 270 posesiones (media 14,0 s), 106 paradas.
 
 ## Resumen a 13-nov 17:40 (para la decisión del 16)
 
@@ -64,7 +66,7 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Ideas de Xavier, una a una: #23 saque desde la línea (`kick_from_line`) | `exp/x23` | coordinador (`C:/MTAH2027/wt-x23`) | banco en Metrica, semillas 0-3, en marcha. #22 descartada. Luego #21, #24, #26 y #25 |
+| Ideas de Xavier, una a una: #21 hueco que es parada (`gap_restart`, `max_move_m` 5 / 10 / 15) | `exp/x21` | coordinador (`C:/MTAH2027/wt-x21`) | barrido en Metrica, semillas 0-3, en marcha. #22 descartada; #23 aceptada. Luego #24, #26 y #25 |
 | Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -137,12 +139,13 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | muerto | `descartado/muerto/modelo-10-partidos` | modelo de balón muerto aprendido con 10 partidos, balón escondido en tiempo muerto | primer filtro: paradas en BAR-ATH 106 -> 82 | descartada; línea del muerto aprendido cerrada |
 | 13-nov | huecos | `descartado/huecos/gap-weight-03` | evidencia de equipo en los huecos (`gap_weight` 0.3, modelo de v6) | +0.0050 (semillas 0-3), +0.0044 (4-7), 11-12/12 celdas | descartada por su regla: check_bar con 105 paradas, menos de 106 (umbral corregido solo para lo siguiente) |
 | 13-nov | datos | `descartado/datos/v9-skillcorner` | modelo de control con 20 partidos (+10 SkillCorner) | −0.0063 (error típico 0.0015), 1/12 celdas, −6,7 posesiones | descartada: su GT grueso enseña a cortar más grueso |
-| 13-nov | huecos | `aceptado/huecos/gap-weight-01` | evidencia de equipo en los huecos, peso 0.1 (confirmación con semillas nuevas) | 8-11 +0.0011, 12-15 +0.0019; check_bar 105 paradas (umbral ±2) | **aceptada (actual)** |
+| 13-nov | huecos | `aceptado/huecos/gap-weight-01` | evidencia de equipo en los huecos, peso 0.1 (confirmación con semillas nuevas) | 8-11 +0.0011, 12-15 +0.0019; check_bar 105 paradas (umbral ±2) | aceptada |
 | 13-nov | control | `descartado/control/peso-v6` | peso de la evidencia de equipo 1.5 / 2 con v6 | +0.002 / +0.003, pero coarseGT −0.009 / −0.016 | descartada: corta más fino (5.º caso) |
 | 13-nov | huecos | `descartado/huecos/forma` | peso de la forma en los huecos 0.05 / 0.2 | 0.2: +0.0010 dudoso; semillas 8-11 −0.0003 | descartada: ruido |
 | 13-nov | control | `descartado/control/red-32` | red de 32 neuronas con 10 partidos | pérdida logarítmica de la red 0.2132 frente a 0.2120 | descartada en la regla 1, sin banco |
 | 13-nov | huecos | `descartado/huecos/red-huecos` | red también para los frames sin balón | mejor pérdida logarítmica en huecos, pero +0.0001 en el banco (dudoso dos veces) | descartada |
 | 13-nov | xavier | `descartado/xavier/parada-minima-3s` | parada mínima de 3 s (idea de Xavier) | +0.0045 (semillas 0-3), +0.0042 (4-7), 12/12 | descartada por su control: en BAR-ATH paradas 105 -> 100 y un saque de puerta sin parada |
+| 13-nov | xavier | `aceptado/xavier/saque-linea` | un golpeo de un balón pegado a la línea reanuda (idea de Xavier) | +0.0023 (semillas 0-3), +0.0032 (4-7), 12/12 en las dos rondas | **aceptada (actual)** |
 
 ## Trabajo de Xavi
 
@@ -296,6 +299,12 @@ aprobación y ningún agente puede escribirlo.
   - llamar a Python a través de una variable de PowerShell (`& $py`): se usó la ruta explícita;
   - un mensaje de commit que nombraba el fichero de decisiones: el commit no lo tocaba y se
     repitió sin nombrarlo.
+- **Documento técnico, nota sobre las ideas de Xavier (13-nov):** §2.4 dice ahora que un miembro
+  del equipo propuso 6 reglas tras revisar los fallos de su versión en los 5 minutos públicos para
+  entender las causas, y que cada una se probó por separado y se decidió solo con el banco.
+  - Es la descripción honesta de lo que pasó.
+  - Decide con Xavier si se queda así. Sin esa nota, el documento diría algo inexacto.
+  - Pídele que borre de la rama pública su `xavier/README.md`, porque describe tramos del partido.
 - **Documento técnico, añadido el 13-nov:** §2.4 dice ahora que un modelo externo (OpenAI Codex)
   criticó cada decisión solo con el método y números agregados, nunca con datos del partido.
   Decide si se queda, junto con lo de abajo.
