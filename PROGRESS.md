@@ -78,7 +78,7 @@ oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 13-nov 22:15, sin novedades desde 0b5782d. Sus 6 ideas, cerradas: 2 aceptadas y 6 descartes (con #21 a 15 m y #28) |
+| Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 13-nov 23:14, sin novedades (`origin/main` 80ad34c, `origin/xavier/mejoras` 0b5782d). Sus 6 ideas, cerradas: 2 aceptadas y 6 descartes (con #21 a 15 m y #28) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
