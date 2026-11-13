@@ -82,7 +82,7 @@ context:
     ensemble: [models/control_v6_lin.json]  # se promedia con un logit lineal (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
     weight_power: 0.25                 # entrenamiento: cada frame pesa (duración de su posesión)^-0.25 (EXPERIMENTS.md #6)
     replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
-    weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
+    weight: 2.0                        # DESCARTADO #17: con v6 corta más fino (coarseGT -0.016)
     gap_weight: 0.1                    # peso por frame sin balón: modelo de huecos (EXPERIMENTS.md #16; 0.3 descartado en #14)
     clip: 4.0                          # límite de su log-odds por frame
 
