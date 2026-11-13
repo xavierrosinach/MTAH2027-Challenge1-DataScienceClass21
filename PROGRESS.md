@@ -64,7 +64,8 @@ oficiales. CSV actual: SHA256 `1077ece7…`, 269 posesiones (media 14,1 s), 105 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi/*`) | — | coordinador | revisión periódica; sin novedades a las 17:11 |
+| Ideas de Xavier, una a una: #22 parada mínima (`min_dead_s` 2 / 3) | `exp/x22` | coordinador (`C:/MTAH2027/wt-x22`) | barrido en Metrica, semillas 0-3, en marcha; luego #23, #21, #24, #26 y #25 |
+| Vigilar el trabajo de Xavi (`origin/main`, `origin/xavi*/*`) | — | coordinador | revisión periódica; última: 18:34 (0b5782d) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
 
@@ -153,6 +154,18 @@ nota pública no cuenta para nada.
 | 13-nov 17:11 | 80ad34c | ninguna | nada nuevo |
 | 13-nov 18:34 | 80ad34c | **`origin/xavier/mejoras` 0b5782d** (13-nov 18:30, sobre nuestro af96572) | 6 reglas de balón parado detrás de opciones, en `xavier/prova-xavier.yaml`; se mide en el banco |
 
+- **13-nov 18:30, `origin/xavier/mejoras` 0b5782d.** Su versión entera ("prova-xavier", sobre
+  nuestro v6 sin `gap_weight`), medida en nuestro banco de Metrica contra `josep/mejoras`:
+  - **semillas 0-3: +0.0326** (error típico 0.0022, 98 % de ejecuciones mejores), 12/12 celdas;
+  - macroF1 +0.022;
+  - por condición: light +0.046, degraded +0.033, +tags +0.015, coarseGT +0.038;
+  - partido 3 +0.028;
+  - `check_bar`: 267 posesiones, 114 paradas, 45,2 % muerto, set pieces con parada 96,6 %.
+
+  Esto es solo informativo. Sus 6 ideas se prueban una a una (EXPERIMENTS #21-#26) en el orden
+  que propuso Codex en la consulta 14: #22, #23, #21, #24, #26 y #25. Su código, con todo
+  apagado, ya está en `josep/mejoras` (e6cd81b; mismo hash `1077ece7…` dos veces). La carpeta
+  `xavier/` no se trae.
 - **13-nov:** Josep cuenta que Xavi tiene un "0,7 de F1" sin subir. No sabemos sobre qué lo ha
   medido; probablemente sobre los 5 minutos públicos, que no deciden nada (R2). No cuenta hasta
   medirlo en el banco. Cuando lo suba:
