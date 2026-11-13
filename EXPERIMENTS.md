@@ -715,7 +715,8 @@ Pre-registered 13-nov, before measuring.
    allows).
 3. *Apply the correction only to future changes.* Done:
 
-**Threshold correction, written 13-nov after #14 and applying from #15 on.** In `check_bar`, the
+**Threshold correction, written 13-nov after #14, for experiments registered from now on (#16 on).**
+In `check_bar`, the
 rule "stoppages >= current" was written for dead-ball changes, which lost real stoppages
 (104-106 -> 82-94). For changes that do not touch the dead-ball evidence it becomes: stoppages
 within ±2 of the current version, and set pieces with a stoppage not below it. Dead-ball changes

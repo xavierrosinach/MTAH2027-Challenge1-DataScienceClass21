@@ -38,7 +38,6 @@ oficiales. CSV actual: SHA256 `c53b0b1b…`, 268 posesiones (media 14,1 s), 106 
 
 | línea | rama | agente | estado |
 |---|---|---|---|
-| #14 evidencia de equipo en los huecos (`gap_weight` 0.1 / 0.3 con el modelo de huecos de v6) | `exp/gap` | coordinador (`C:/MTAH2027/wt-gap`) | semillas 0-3: 0.3 da +0.0050 (error típico 0.0008), 4/4 condiciones, 12/12 celdas y partido 3 +0.004; 0.1 da +0.0031. Candidato 0.3: faltan semillas 4-7 y check_bar, después del entrenamiento de v9 |
 | #15 v9: v6 + 10 partidos SkillCorner (A-League, MIT, tracking de broadcast) | `exp/skillcorner` | coordinador; fase 1, worker Claude (`C:/MTAH2027/wt-skillcorner`) | fase 1 hecha (GT desde sus eventos de posesión, coherente pero grueso). Regla registrada; entrenando v9 con 20 partidos (1 proceso, sin copias de evaluación) |
 
 ### Regla para la línea IDSSE (escrita el 12-nov, ANTES de medir v6)
@@ -109,6 +108,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | 13-nov | control | `descartado/control/train-mix-light` | v6 entrenado también con copias `light` | +0.0027, pero coarseGT −0.0053 | descartada: corta más fino (+6 posesiones) |
 | 13-nov | huecos | `descartado/huecos/interp-50` | interpolar huecos del balón hasta 1-2 s | +0.0005; con semillas 8-11, −0.0004 | descartada: ruido |
 | 13-nov | muerto | `descartado/muerto/modelo-10-partidos` | modelo de balón muerto aprendido con 10 partidos, balón escondido en tiempo muerto | primer filtro: paradas en BAR-ATH 106 -> 82 | descartada; línea del muerto aprendido cerrada |
+| 13-nov | huecos | `descartado/huecos/gap-weight-03` | evidencia de equipo en los huecos (`gap_weight` 0.3, modelo de v6) | +0.0050 (semillas 0-3), +0.0044 (4-7), 11-12/12 celdas | descartada por su regla: check_bar con 105 paradas, menos de 106 (umbral corregido solo para lo siguiente) |
 
 ## Mapa de líneas (lo probado, el resultado y lo siguiente)
 
@@ -119,7 +119,7 @@ están en "Tags", y en EXPERIMENTS.md, tabla "Every path explored".
 | Balón muerto | modelo aprendido (#7); `dead_weight`; `to_dead`, `from_dead`; 6 constantes de reglas | `dead_weight` 0.3 aceptado; `to_dead` 20 no transfiere; el resto, plano | #13 (aprendido con 10 partidos) también falla en BAR-ATH (106 -> 82 paradas): línea del muerto aprendido CERRADA. Solo transfiere el modelo ajustado en nuestro propio partido |
 | Viterbi | `team_switch` 16 / 13 / 20; costes de muerto | 16 aceptado; el resto depende de la granularidad del GT | estado "disputado" (Codex 01), sin probar |
 | Posesiones cortas (< 2 s) | peso por posesión 0.25 / 0.5 / 1; rasgos de toques y de 0,5 s | 0.25 aceptado; lo demás solo gana con GT fino | consulta 02 |
-| Huecos sin balón | `gap_weight` (v3); interpolar 1-2 s (#12) | ruido; ruido | #14: `gap_weight` con el modelo de huecos de v6 (10 partidos) |
+| Huecos sin balón | `gap_weight` (v3); interpolar 1-2 s (#12); `gap_weight` 0.3 con v6 (#14) | ruido; ruido; **señal real** (+0.004-0.005), pero descartada por 105 < 106 paradas | #16: `gap_weight` 0.1 confirmado SOLO con semillas nuevas (8-11), si hay tiempo |
 | Smart Tagging | evidencia débil de las fases de ataque en huecos (0.03) | sin medir en el banco (no hay sustituto de las fases) | motivo para no probarlo, o un sustituto desde eventos |
 
 ## Cola de ideas (en orden)
