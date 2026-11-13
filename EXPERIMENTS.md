@@ -981,3 +981,35 @@ network. Capacity is not the bottleneck: the features are.
 *What we learn (#20):* a better component on held-out log-loss is not a better labeller when its
 evidence is a small share of the decision. Gains now need evidence that changes many hand-overs,
 and none of the remaining ideas offers that within the deadline.
+
+## Xavier's ideas (branch `origin/xavier/mejoras` 0b5782d), separated, pre-registered 13-nov
+
+Xavier added six dead-ball and tracking rules behind options (`src/possession/context.py`; all
+off in `config.yaml`, on in his `xavier/prova-xavier.yaml`).
+- **Origin of the ideas.** His README says they came from inspecting his version's failures in
+  the public 5 minutes, "only to understand the cause".
+- **How they are tested.** Following the "Trabajo de Xavi" rule, each idea is tested here as a
+  single change on `josep/mejoras`, with values chosen on the bench, never his. Nothing from the
+  public window is used. His whole version is also measured on our bench, for information only.
+- **Rule for every one** (dead-ball changes keep the strict stoppage check):
+  - Sweep or on/off on the Metrica bench, seeds 0-3. A candidate has mean spellF1 up under each
+    of the 4 conditions, >= 7/12 cells, macroF1 not down, game 3 not down; among passing values,
+    the higher mean.
+  - The candidate needs the same on seeds 4-7.
+  - `check_bar`: 240-300 possessions, stoppages and set pieces with a stoppage not below the
+    current version.
+  - Doubtful: seeds 8-11.
+  - Each is measured against `josep/mejoras` as it is when it starts. If an earlier one is
+    accepted, the next one is measured on top of it.
+
+| # | idea | option | values tried |
+|---|---|---|---|
+| 21 | a ball gap that is a stoppage (the ball reappears near where it was lost, >= 3 s) | `gap_restart` | `max_move_m` 5 / 10 / 15 |
+| 22 | minimum stoppage length in the decoder | `transition_cost.min_dead_s` | 2 / 3 (now 1) |
+| 23 | a kick from a ball on the line counts as a restart (corners, throw-ins) | `ball_dead.kick_from_line` | on |
+| 24 | a restart needs play: a kick followed by the ball at rest within 6 s with no second player does not restart | `restart_check` | on |
+| 25 | an isolated, still ball while everyone runs is a tracking error | `ball_dead.isolated_max_player_speed` | 1.5 / 2.0 m/s |
+| 26 | a player lost behind a rival is kept as a "ghost" next to him | `occlusion` | on |
+
+None of these appears in "Every path explored". #26 is a tracking fix the bench does not simulate
+(the degradation cuts tracks at random, not behind rivals). It is tested last, under the same rule.
