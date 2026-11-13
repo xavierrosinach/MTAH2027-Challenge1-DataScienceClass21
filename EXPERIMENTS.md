@@ -280,6 +280,17 @@ learnt model in charge, they were swept one by one on #6 (`sweep.py`, seeds 0-3,
   the BAR-ATH check**: stoppages 104 -> 94, set pieces with a stoppage 96.6 -> 94.8 % (a goal
   kick lost). Same pattern as #7: a dearer stoppage costs real ones on our tracking. Tag
   `descartado/muerto/to-dead-20`.
+- Second round on #9 (branch `exp/muerto2`, no candidate, not tagged): the dead-ball rule
+  constants, change in mean spellF1 (cells better of 12):
+  - `dead_llr_clip` (3): 2 -0.0001 (1), 5 -0.0003 (0);
+  - `ball_dead.inside_llr` (0.5): 0 **-0.0203** (0), 1 +0.0003 (7, macroF1 -0.005);
+  - `out_llr` (2): 1 +0.0004 (7), 4 -0.0003 (0);
+  - `isolated_llr` (1.5): 0.5 +0.0010 (9), 3 -0.0016 (0);
+  - `latch_llr` (1.5): 0.75 +0.0004 (7), 3 -0.0004 (0);
+  - `kick_llr` (2): 1 +0.0003 (6), 4 -0.0005 (3).
+
+  All flat within noise: the rules are at a sensible point; only the "ball seen inside the pitch"
+  evidence matters (removing it costs 0.02).
 - Error analysis of #6 (`errors.py`, `degraded`): spellF1 0.573; perfect stoppages 0.632, perfect
   team 0.853. True possessions found at IoU 0.5: < 2 s 11 %, 2-5 s 42 %, 5-10 s 67 %, 10-20 s 78 %,
   > 20 s 79 %. Missed: 20 % to the rival, 21 % merged or wrong edges, 8 % called dead.
