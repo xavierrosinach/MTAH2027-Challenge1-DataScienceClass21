@@ -874,3 +874,27 @@ That leans against cutting finer than we do, and gives no rule to tune on. The c
 coarse one. That makes five now: possession weighting, `team_switch`, `train_mix`, SkillCorner (in
 the other direction) and this weight. The current setting is the robust middle. The remaining
 gains must come from evidence that is right more often at the same cut, as v6 and #16 were.
+
+### #19 a larger network now that there are 10 games (branch `exp/red32`)
+
+Pre-registered 13-nov, before measuring. Runs after #18 closes, against `josep/mejoras` as it is
+then.
+- **Change:** `context.control.mlp.hidden` 16 -> 32, retrained on the 10 games like v6 (same
+  features, epochs, l2, seed, `weight_power`; the linear member unchanged). Models
+  `control_v10_*`.
+- **Reason:**
+  - #8 showed the error left is bias, not variance.
+  - The network's size was chosen with 3 games, where 32 hidden units overfit (held-out log-loss
+    0.22-0.28 vs 0.17-0.19).
+  - With 10 games (about 3x the frames), more capacity may now pay.
+- **Rule:**
+  1. Held-out log-loss of the network (`train_control.py` output, frames with the ball), mean
+     over the 10 games, lower than v6's network with the same code. If not, rejected without a
+     bench.
+  2. As #10 (a) and (b), seeds 0-3: 10-game bench (Metrica + IDSSE) up under each of the 4
+     conditions, more than 20/40 cells, macroF1 not down; Metrica alone up under each of the 4
+     conditions, >= 7/12 cells, macroF1 not down, game 3 not down.
+  3. The same on seeds 4-7.
+  4. `check_control` (relative, as #15 (d)).
+  5. `check_bar` with the corrected threshold for non-dead-ball changes.
+  6. Doubtful: seeds 8-11.
