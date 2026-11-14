@@ -82,5 +82,10 @@ def load_tracking(cfg, game="BAR-ATH"):
         os.makedirs(cache_dir, exist_ok=True)
         np.savez(cache_path, ball=ball, players=players, speed=speed)
 
-    return {"ball": ball, "players": players, "speed": speed, "team": team,
-            "pitch": games.GAMES[game]["pitch"], "n_frames": n_frames, "game": game}
+    tracking = {"ball": ball, "players": players, "speed": speed, "team": team,
+                "pitch": games.GAMES[game]["pitch"], "n_frames": n_frames, "game": game}
+    if (cfg.get("broadcast") or {}).get("enabled"):
+        # what the tactical camera misses, from the broadcast tracking (src/possession/broadcast.py)
+        from . import broadcast
+        tracking = broadcast.fuse(tracking, cfg, verbose=cfg["output"].get("verbose", True))
+    return tracking

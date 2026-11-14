@@ -13,20 +13,33 @@ create_video_gt.py       vídeo de los 5 min públicos: etiqueta del GT y la nue
 src/possession/
   config.py              carga config.yaml y resuelve rutas
   data.py                lee el tracking (ATD) y el Smart Tagging, con caché en cache/
+  broadcast.py           tracking del broadcast: alineación con el táctico, plano en directo y balón
   context.py             el etiquetador: evidencias por frame + Viterbi sobre {H, A, D}
+  control.py             modelo aprendido de qué equipo controla el balón
   diagnostics.py         comprobaciones sin ground truth (output.diagnostics: true)
   submission.py          escribe el CSV, validador oficial y tabla comparativa
   data_proc.py           cruza ATD + Smart Tagging + homografía en tablas (las usan los vídeos)
   video.py               vídeos de revisión con el tracking y nuestra etiqueta
+models/                  pesos del modelo de control (entrenado en otros partidos, nunca en BAR-ATH)
 docs/technical_report.md documento técnico (entregable)
 ```
+
+## Resultado
+
+En los 5 minutos públicos (solo comprobación, 17 posesiones): **macroF1 0,938 y spellF1 0,710**.
+La mejor baseline oficial (`baseline_smooth125`) da 0,581 y 0,424.
+
+Las decisiones no se han tomado con esa cifra, sino en un banco de validación con otros partidos
+(ver "Cómo se ha validado").
 
 ## Requisitos
 
 - Python 3.12
 - El repositorio oficial clonado al lado: `../more-than-a-hack-2027`
   (se usan su `games.py`, el validador, el evaluador y sus baselines)
-- Los datos del partido en `../data` o en la ruta de la variable `MTAH_DATA_DIR`
+- Los datos del partido en `../data` o en la ruta de la variable `MTAH_DATA_DIR`: el tracking
+  táctico y el Smart Tagging, y el tracking del broadcast (si falta, el etiquetador funciona igual
+  sin las dos reglas que lo usan)
 
 ```
 More Than a Hack - Data Science 21 Class/
@@ -44,8 +57,9 @@ pip install -r requirements.txt
 python run.py
 ```
 
-La primera ejecución tarda 1-2 minutos (lee el tracking y lo guarda en `cache/`); las
-siguientes, unos segundos. La salida es solo esto:
+La primera ejecución tarda unos minutos (lee los dos trackings y los guarda en `cache/`); las
+siguientes, alrededor de un minuto. `python run.py --no-public` escribe el CSV e imprime su
+SHA256, sin la tabla ni los vídeos. La salida normal es solo esto:
 
 ```
 written outputs/submissions/DataScienceClass21.csv   H ...  A ...  D ...  X ...
@@ -80,27 +94,80 @@ elige la secuencia más probable del partido entero, con un coste por cada cambi
 - Reglas del balón: visto fuera del campo; perdido al salir o yendo a cruzar una línea; abandonado
   (nadie a < 6 m durante 2 s); tras salir sigue muerto hasta el siguiente golpeo (el saque).
 - Goles: muerto desde el último balón cerca de la portería hasta el tag `Kick Off (After Goal)`.
-- Un tramo D necesita alguna de estas razones; si solo hay jugadores lentos, pasa a vivo.
+- Hueco que es parada: si el balón desaparece al menos 3 s y reaparece a menos de 10 m de donde
+  se perdió, es una falta o un fuera de juego (se saca desde el sitio).
+- Saque desde la línea: córners y saques de banda empiezan sobre la línea; ese golpeo también
+  cuenta como reanudación.
+- Saque falso: un golpeo no reanuda si el balón vuelve a pararse en menos de 6 s sin que lo toque
+  un segundo jugador (el portero que lo coloca, devolverlo al sitio).
+- Balón falso: un balón quieto y solo mientras todos corren es un error del tracking, no una parada.
+- Un tramo D necesita alguna razón; si solo hay jugadores lentos, pasa a vivo.
 - Con el balón visible, reanudar solo es barato en el momento de un golpeo.
 
 **¿Qué equipo?**
-- Cercanía al balón (solo con contacto: con el balón suelto la posesión sigue al último equipo).
+- Modelo de control (`control.py`): una red pequeña promediada con un modelo lineal, que estima
+  qué equipo controla el balón a partir de las distancias al balón y del movimiento de los
+  jugadores respecto a él. Está entrenado en 10 partidos ajenos (3 de Metrica y 7 de IDSSE) con el
+  tracking degradado para que se parezca al nuestro; nunca ha visto BAR-ATH. Sustituye a la
+  simple cercanía al balón.
 - Pases completados: toque de un jugador y control de un compañero a >= 5 m; dos seguidos bastan
   para una posesión corta. Cuentan los pases de primeras; un roce corto del rival no los corta.
-- Quien golpea el balón da media evidencia de cambio a su equipo: decide quién saca, pero un
-  despeje solo no cambia la posesión.
+- Quien golpea el balón da evidencia a su equipo: decide quién saca, pero un despeje solo no
+  cambia la posesión.
 - Porteros: el tracking a veces intercambia sus identidades; su equipo se fija por la portería
   que defienden.
+- Jugador solapado: cuando el tracking pierde a un jugador tapado por un rival, se mantiene como
+  "fantasma" pegado a ese rival hasta que vuelve a detectarse (máximo 10 s).
 - Donde no se ve el balón: modelo de forma de los equipos (anchura, profundidad, avance; 2.ª
   pasada, entrenado con los frames de contacto claro) y, débil, las fases del Smart Tagging.
 - Balón parado con equipo en el tag: ese equipo saca.
 
-**Viterbi:** cambiar H↔A cuesta 20, pasar a D 10, reanudar 5; un tramo D dura al menos 1 s. Como
+**Viterbi:** cambiar H↔A cuesta 16, pasar a D 10, reanudar 5; un tramo D dura al menos 3 s. Como
 mira el partido entero, el cambio cae donde cambia la evidencia (cuando el nuevo equipo toca el
 balón), sin el retraso de un filtro causal.
 
-Ninguna constante se ha elegido con la nota pública: salen de razonar sobre el fútbol, de mirar
-los datos y los vídeos, y de los diagnósticos sin ground truth (`output.diagnostics: true`).
+## Qué aporta el broadcast (`src/possession/broadcast.py`)
+
+La base es siempre el tracking táctico: ningún jugador se añade ni se mueve. Del broadcast se
+toman dos cosas.
+
+1. **Alineación.** Las dos grabaciones no están sincronizadas. Como ambos trackings están en
+   coordenadas de campo, el desfase es el que pone el balón del broadcast encima del balón del
+   táctico. Se busca solo, por parte, en ventanas de un minuto, y sale constante en cada parte.
+2. **Plano en directo.** Un frame del broadcast solo se usa si muestra el mismo instante: sus
+   jugadores tienen que caer sobre los del táctico (mediana < 2 m). Así se descartan repeticiones,
+   primeros planos y planos de grada. Queda el 61 % del partido.
+3. **Balón donde el táctico no lo ve.** En esos frames en directo se usa el balón del broadcast si
+   falta el del táctico (3,8 % del partido).
+4. **La realización como motivo de parada.** La TV corta a repeticiones y primeros planos sobre
+   todo con el balón parado: está fuera del plano general en el 50-66 % de los frames claramente
+   parados y en el 12 % de los claramente vivos. Una parada que pasa más de la mitad de su
+   duración en corte de TV tiene motivo y no se convierte en juego vivo. Recupera, por ejemplo,
+   paradas por tarjeta o por protestas que el Smart Tagging no etiqueta.
+
+## Cómo se ha validado
+
+Ninguna constante se ha elegido con la nota pública (RULES.md). Las reglas salen de razonar sobre
+el fútbol y de mirar los datos y los vídeos; después se deciden en un banco de validación con
+otros partidos (los tres partidos públicos de Metrica, con el tracking degradado para parecerse
+al nuestro: jugadores fragmentados, balón con ruido y con huecos), comparando cada cambio con
+diferencias emparejadas por partido y semilla. El banco no forma parte de este repositorio.
+
+| Cambio | Efecto en spellF1 (banco) |
+|---|---|
+| Reglas de balón parado (hueco, parada mínima, saque desde la línea, saque falso, balón falso, solapados) | +0,018 a +0,045 según la condición, 11-12 de 12 ejecuciones mejores |
+| Realización de TV como motivo de parada (TV simulada con las tasas medidas en BAR-ATH) | +0,005 con tags, +0,011 a +0,014 sin tags |
+
+El balón del broadcast no se puede medir en el banco, que no tiene segunda cámara. Se ha
+comprobado en el propio partido sin etiquetas: escondiendo el balón del táctico en tramos donde
+las dos cámaras lo ven, el del broadcast recupera el 96 % de las etiquetas dentro del hueco
+(sin rellenar, el 74 %).
+
+Lo que más nota cuesta en el banco son los huecos del balón; los jugadores perdidos por el
+tracking apenas influyen. Por eso del broadcast se toma el balón y no jugadores.
+
+Los comentarios de `config.yaml` citan `EXPERIMENTS.md` y scripts de `validation/`: son del banco
+y tampoco están en este repositorio.
 
 ## Vídeos de revisión
 

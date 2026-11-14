@@ -21,6 +21,13 @@ context:
     depth_m: 17.0                      # un slot es portero si pasa casi toda la parte a < 17 m de una línea de gol...
     share: 0.7                         # ...en más del 70 % de sus frames; su equipo = el que defiende esa portería
 
+  occlusion:                           # jugador que el tracking pierde al solaparse con un rival: sigue ahí
+    enabled: true                      # mantenerlo como "fantasma" pegado a ese rival (banco: neutro)
+    radius_m: 2.0                      # desaparece con un rival a < 2 m -> está tapado por él
+    max_s: 10                          # el fantasma dura como máximo 10 s
+    release_m: 1.5                     # termina si se ve a un compañero a < 1,5 m del fantasma (vuelve a estar detectado)
+    reborn_m: 5.0                      #   o si nace un slot de su equipo a < 5 m (el tracker lo ha recuperado)
+
   pseudo:                              # reglas que crean las etiquetas de entrenamiento del modelo de balón muerto
     out_m: 1.0                         # muerto: balón visto a > 1 m fuera del campo
     set_piece_s: 3                     # muerto: primeros 3 s de un tag SET PIECES (el saque llega a los 4-6 s)
@@ -28,7 +35,7 @@ context:
     live_near_m: 1.5                   #   con un jugador a < 1,5 m,
     live_ball_speed: 1.0               #   y el balón moviéndose a > 1 m/s
 
-  dead_weight: 0.5                     # peso por frame del modelo de balón muerto (velocidad de los jugadores)
+  dead_weight: 0.3                     # peso por frame del modelo de balón muerto (velocidad de los jugadores); 0.5 -> 0.3: banco, EXPERIMENTS.md #9
   dead_llr_clip: 3.0                   # límite de su evidencia por frame
 
   ball_dead:                           # reglas de balón muerto según dónde está o adónde iba el balón
@@ -42,10 +49,29 @@ context:
     isolated_max_speed: 8.0            #   rodando o parado (no un pase largo en el aire),
     isolated_s: 2.0                    #   durante 2 s -> nadie lo está jugando
     isolated_llr: 1.5                  #   evidencia de muerto por frame
+    isolated_backdate: false           # true: la parada empieza cuando el balón se queda solo, no 2 s después
+    isolated_max_player_speed: 1.6     #   ...y solo si los jugadores van despacio (media 2 s < X m/s); null = sin condición.
+                                       #   Balón quieto y solo mientras todos corren = balón falso del tracking. banco: neutro
     kick_speed: 6.0                    # golpeo: balón visto dentro del campo a > 6 m/s -> el juego (re)empieza
     kick_llr: 2.0                      #   evidencia de vivo por frame del golpeo
     latch_llr: 1.5                     # tras salir el balón, sigue muerto hasta el siguiente golpeo (el saque)...
     latch_max_s: 60                    #   ...como máximo 60 s
+    kick_from_line: true               # true: también cuenta el golpeo de un balón pegado a la línea que entra al campo (córner, banda)
+
+  restart_check:                       # reanudar exige JUEGO: un jugador que mueve un balón parado no reanuda
+    enabled: true                      #   (devolverlo al sitio, el portero que lo coloca para el saque de puerta)
+    rest_speed: 1.0                    # el balón vuelve a estar parado: < 1 m/s...
+    rest_s: 1.0                        #   ...durante 1 s
+    max_s: 6                           # ...antes de 6 s desde el golpeo, sin que lo toque un segundo jugador
+    kicks: true                        # parte 1: ese golpeo no cuenta como saque (no suelta la parada)
+    spells: true                       # parte 2: parada -> un solo jugador toca -> balón solo otra vez = sigue parado
+
+  gap_restart:                         # hueco sin balón que es una parada: el balón reaparece donde se perdió
+    enabled: true                      #   (falta o fuera de juego: se saca desde el sitio)
+    min_s: 3                           # hueco de al menos 3 s
+    max_move_m: 10.0                   # el balón reaparece a < 10 m de donde se dejó de ver (banco: 6 -> 10, +0,010)
+    max_speed: null                    #   o su velocidad neta en el hueco (distancia / duración) es < X m/s; null = no usar
+    llr: 1.5                           # evidencia de muerto por frame del hueco
 
   goal:                                # gol: muerto desde el último balón cerca de la portería hasta el saque de centro
     zone_depth_m: 16.5                 # zona del tamaño del área delante de cada portería: profundidad
@@ -65,6 +91,20 @@ context:
     smooth_s: 2                        # media móvil de las variables de forma (s)
     own_m: 1.0                         # pseudo-etiquetas: el equipo etiquetado a < 1 m del balón visto...
     opp_m: 2.0                         #   ...y el rival a > 2 m
+
+  control:                             # modelo aprendido de quién controla el balón (src/possession/control.py)
+    enabled: true                      # entrenado en OTROS partidos (validation/train_control.py); EXPERIMENTS.md #3
+    model: models/control_v6_mlp.json  # pesos: 10 partidos ajenos (3 Metrica + 7 IDSSE), tracking degradado; nunca BAR-ATH (EXPERIMENTS.md #10)
+    features: [base, motion]           # grupos de rasgos (control.py): base + movimiento de los jugadores
+                                       #   respecto al balón (EXPERIMENTS.md #4); long y touch, descartados
+    model_type: mlp                    # `model` es una red antisimétrica (1 capa oculta) para frames con balón
+    mlp: {hidden: 16, epochs: 4, l2: 0.001, lr: 0.002, batch: 2048, seed: 0}   # elegido por log-loss en partido no visto
+    ensemble: [models/control_v6_lin.json]  # se promedia con un logit lineal (sola, la red pierde en el partido 3; EXPERIMENTS.md #5)
+    weight_power: 0.25                 # entrenamiento: cada frame pesa (duración de su posesión)^-0.25 (EXPERIMENTS.md #6)
+    replace_proximity: true            # sustituye la evidencia de cercanía de `ball`
+    weight: 1.0                        # peso por frame de su log-odds con balón visto (banco: plano entre 1 y 2,5)
+    gap_weight: 0.0                    # peso por frame sin balón (solo la forma de los equipos)
+    clip: 4.0                          # límite de su log-odds por frame
 
   passes:                              # toques, golpeos y pases completados
     touch_m: 1.5                       # toque: el jugador más cercano a < 1,5 m del balón visto...
@@ -93,11 +133,15 @@ context:
     sp_after_s: 5                      #   ...o hasta 5 s después
     long_s: 30                         # razón: dura >= 30 s (goles, lesiones, cambios)
 
+  tv_cut:                              # la realización de TV corta a repeticiones y primeros planos sobre todo con el balón parado
+    enabled: true                      # una parada tiene motivo si la TV la pasó fuera del plano general (necesita broadcast.enabled)
+    support_share: 0.5                 # ...durante más de la mitad de sus frames (banco con TV simulada: +0,005 con tags, +0,011 sin)
+
   transition_cost:                     # costes de Viterbi para cambiar de estado (en llr)
-    team_switch: 20                    # cambiar de H a A o al revés
+    team_switch: 16                    # cambiar de H a A o al revés (20 -> 16: banco de validación, EXPERIMENTS.md #2)
     to_dead: 10                        # pasar de juego vivo a D
     from_dead: 5                       # reanudar (D -> equipo)
-    min_dead_s: 1.0                    # un tramo D dura al menos 1 s
+    min_dead_s: 3.0                    # un tramo D dura al menos 3 s (banco: solo el 3 % de las paradas reales duran menos; 1 -> 3, +0,004)
     restart_without_kick: 10           # coste extra de reanudar si se ve el balón y nadie lo golpea...
     kick_window_s: 0.5                 #   ...en +/- 0,5 s
 
@@ -109,8 +153,21 @@ output:
   verbose: false                       # imprimir lo que hace el etiquetador (pases, porteros, modelos...)
   diagnostics: false                   # imprimir los diagnósticos sin ground truth (src/possession/diagnostics.py)
 
+broadcast:                             # lo que aporta el tracking del broadcast (src/possession/broadcast.py); la base es el táctico
+  enabled: true                        # leerlo: saber si la TV está en el plano general en directo y, si fill_ball, tomar su balón
+  fill_ball: true                      # balón del broadcast donde el táctico no lo ve (escondiendo el del táctico recupera el 96 % de las etiquetas)
+  window_s: 60                         # alineación: ventanas de 1 min del táctico...
+  windows_per_half: 12                 #   ...12 por parte,
+  min_ball_frames: 300                 #   con balón visto en al menos 300 frames
+  max_lead_s: 200                      # el broadcast empieza como mucho 200 s antes que el táctico
+  match_m: 2.0                         # una ventana encaja si el balón de ambos difiere < 2 m de mediana
+  offset_tolerance_frames: 3           # ventanas que dan el mismo desfase (+-3 frames)
+  min_windows: 4                       #   hacen falta al menos 4 para fiarse
+  min_players: 4                       # frame "en directo": al menos 4 jugadores en cada cámara...
+  live_m: 2.0                          #   ...y los del broadcast a < 2 m (mediana) de uno del táctico
+
 video:                                 # vídeos de revisión: tracking + nuestra etiqueta (letra grande arriba a la derecha)
-  enabled: true                        # generar vídeos al ejecutar run.py
+  enabled: false                       # generar vídeos al ejecutar run.py
   blocks: [2T]                         # qué bloques (prefijo del nombre): [1T_01], [1T], [2T_03, 2T_04]; [] = todos
   block_minutes: 5                     # duración de cada bloque (min)
   mode: overlay                        # overlay = vídeo real + tracking; pitch = solo campo 2D (más rápido)
