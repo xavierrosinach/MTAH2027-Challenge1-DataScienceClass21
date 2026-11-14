@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-14 18:30 (resumen de congelación)
+**Actualizado:** 2026-11-14 18:23 (resumen de congelación)
 
 **Calendario:**
 
