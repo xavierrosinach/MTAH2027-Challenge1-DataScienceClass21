@@ -4,7 +4,7 @@ Panel para Josep. Se actualiza después de cada experimento. El detalle está en
 [EXPERIMENTS.md](EXPERIMENTS.md) y el documento técnico en
 [docs/technical_report.md](docs/technical_report.md).
 
-**Actualizado:** 2026-11-13 22:15
+**Actualizado:** 2026-11-14 18:30 (resumen de congelación)
 
 **Calendario:**
 
@@ -41,6 +41,48 @@ baseline oficial (banco de Metrica).
 Ojo: el banco no es la nota real. Mide sobre otros 3 partidos con el tracking degradado como el
 nuestro, y sirve para comparar versiones entre sí. La nota real solo se sabrá con los resultados
 oficiales. CSV actual: SHA256 `567f0d71…`, 281 posesiones (media 12,4 s), 130 paradas, 45,4 % muerto.
+
+## CONGELACIÓN (14-nov 20:00): resumen final del coordinador
+
+- **Versión recomendada para entregar:** `josep/mejoras`, código y config de 9ada683. Lo que
+  viene después es solo documentación.
+  - CSV SHA256 `567f0d710f4d605f00489e474b068390edce119120b7bba29f8098b6f16f0aae`.
+  - H 52362 / A 34398 / D 72097 / X 40462.
+  - Regenerado dos veces con el mismo hash, y una vez desde un worktree limpio. `check_rules`
+    PASS.
+- **Qué lleva:**
+  - el etiquetador de contexto con Viterbi;
+  - el modelo de control v6 (red + lineal, entrenado con 3 partidos de Metrica y 7 de IDSSE);
+  - `dead_weight` 0.3;
+  - la evidencia de equipo en los huecos (0.1);
+  - dos reglas de Xavier, validadas en el banco: el saque desde la línea y el hueco que es parada
+    a 10 m.
+- **Banco de Metrica:**
+  - media de las 4 condiciones: la versión actual saca **0.662** con semillas 8-11 y **0.667** con
+    semillas 12-15 (medido en la confirmación de #27);
+  - condición degradada, semillas 0-3 (`errors.py`): 0.623, cuando v4 sacaba 0.573 y la primera
+    versión con modelo aprendido, 0.540;
+  - main de Xavier sacaba 0.455 (media de las 4 condiciones, semillas 0-3). Las semillas son
+    distintas, así que la comparación es aproximada.
+- **En nuestro partido** (sin etiquetas): 281 posesiones, 130 paradas (justo en el tope) y 45,4 %
+  de tiempo muerto.
+- **Experimentos del 12 y 13 de noviembre:** 21 cerrados (#8-#28), cada uno con su regla escrita
+  antes de medir y criticado por Codex (consultas 01-23 en `C:\consultas-ia`). 6 aceptados y 15
+  descartados, todos con su etiqueta en origin.
+- **Pendiente para Josep y Xavier (16-nov):**
+  - Revisar la nota de transparencia del documento técnico (§2.4) sobre el origen de las reglas
+    de Xavier.
+  - Pedir a Xavier que borre `xavier/README.md` de la rama pública: describe tramos del partido
+    y su nota pública.
+  - Decidir las líneas sobre el asistente de IA y Codex del documento técnico, y añadir los 4
+    nombres.
+  - Decidir qué pasa a `main` (R6: lo hacéis vosotros, no el coordinador).
+  - Exportar el documento técnico como `DataScienceClass21.pdf` o `.md`, y entregar el CSV y el
+    repo antes del 17-nov.
+- **Riesgos conocidos:**
+  - 130 paradas es más que en los partidos reales que tenemos (92-113);
+  - las posesiones de menos de 2 s siguen sin verse;
+  - el banco no es la nota real.
 
 ## Resumen a 13-nov 22:15 (para la decisión del 16)
 
