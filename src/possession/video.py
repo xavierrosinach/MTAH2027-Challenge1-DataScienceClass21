@@ -82,7 +82,7 @@ class Pitch:
 # --- main
 
 def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=True,
-               label_col=None, step=1, fps=25, progress_every=2500):
+               label_col=None, step=1, fps=25, progress_every=2500, view=None):
     """Write an mp4 with every frame in `sel` (rows of the frames table).
 
     sel        frames DataFrame (filtered), needs frame, ball_*, h00..h22, clock, period, st_*
@@ -92,6 +92,10 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
     label_col  optional column (or list of columns) in sel to show as big letters, top right,
                left to right in the given order; when two differ they get a yellow frame
     step       keep 1 frame every `step`
+    view       optional broadcast tracking on the tactical timeline (tracking["broadcast_view"]):
+               its players with no tactical player of their team within 2.5 m are drawn as
+               squares (what only the broadcast camera sees), and its ball as a diamond while
+               the tactical one is missing
     """
     import cv2
     import games
@@ -117,6 +121,27 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
     Hm = sel[H_COLS].to_numpy(np.float64).reshape(-1, 3, 3)
     bx, by = _project(Hm, last_x, last_y)                  # last seen (= current when seen)
     b_xm, b_ym = last_x * games.GAMES["BAR-ATH"]["pitch"][0], last_y * games.GAMES["BAR-ATH"]["pitch"][1]
+
+    # what only the broadcast camera sees, per output frame: [(x_m, y_m, px, py, home)], ball
+    pitch = np.array(games.GAMES["BAR-ATH"]["pitch"], dtype=float)
+    only_bro, bro_ball = [[] for _ in range(n)], [None] * n
+    if view is not None:
+        v_home = view["team"] == 0
+        for i in range(n):
+            q = view["players"][fr[i]] * pitch
+            ok = np.flatnonzero(~np.isnan(q[:, 0]))
+            if not len(ok):
+                continue
+            a, b = lo[i], hi[i]
+            d = np.hypot(q[ok, None, 0] - p_xm[None, a:b], q[ok, None, 1] - p_ym[None, a:b])
+            d[v_home[ok][:, None] != p_home[None, a:b]] = np.inf
+            new = ok[(d.min(axis=1) if b > a else np.full(len(ok), np.inf)) > 2.5]
+            px, py = _project(np.repeat(Hm[i][None], len(new), axis=0), q[new, 0] / pitch[0], q[new, 1] / pitch[1])
+            only_bro[i] = list(zip(q[new, 0], q[new, 1], px, py, v_home[new]))
+            vb = view["ball"][fr[i]]
+            if not seen[i] and not np.isnan(vb[0]):
+                x, y = _project(Hm[i][None], vb[:1], vb[1:])
+                bro_ball[i] = (vb[0] * pitch[0], vb[1] * pitch[1], x[0], y[0])
 
     tags_txt = _active_tags(sel)
     cols = [label_col] if isinstance(label_col, str) else list(label_col or [])
@@ -149,6 +174,12 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
         r = max(3, int(mini.s * 0.9))
         for x, y, h in zip(xs, ys, p_home[a:b]):
             cv2.circle(img, (x, y), r, HOME if h else AWAY, -1)
+        for xm, ym, _, _, h in only_bro[i]:
+            x, y = mini.xy(np.array([xm]), np.array([ym]))
+            cv2.rectangle(img, (x[0] - r, y[0] - r), (x[0] + r, y[0] + r), HOME if h else AWAY, 1)
+        if bro_ball[i] is not None:
+            x, y = mini.xy(np.array([bro_ball[i][0]]), np.array([bro_ball[i][1]]))
+            cv2.drawMarker(img, (x[0], y[0]), BALL, cv2.MARKER_DIAMOND, r * 2, 1)
         if not np.isnan(b_xm[i]):
             x, y = mini.xy(np.array([b_xm[i]]), np.array([b_ym[i]]))
             if seen[i]:
@@ -180,6 +211,14 @@ def make_video(sel, players, cfg, out_path, mode="overlay", scale=0.5, minimap=T
                     c = HOME if h else AWAY
                     cv2.circle(img, (int(x), int(y)), r, c, 2)
                     cv2.putText(img, str(s), (int(x) - r, int(y) - r - 2), font, fs * 0.7, c, 1, cv2.LINE_AA)
+            for _, _, x, y, h in only_bro[i]:
+                if np.isfinite(x) and np.isfinite(y):
+                    x, y, c = int(x * scale), int(y * scale), HOME if h else AWAY
+                    cv2.rectangle(img, (x - r, y - r), (x + r, y + r), c, 2)
+                    cv2.putText(img, "TV", (x - r, y - r - 2), font, fs * 0.7, c, 1, cv2.LINE_AA)
+            if bro_ball[i] is not None and np.isfinite(bro_ball[i][2]):
+                cv2.drawMarker(img, (int(bro_ball[i][2] * scale), int(bro_ball[i][3] * scale)), BALL,
+                               cv2.MARKER_DIAMOND, r * 2, 2)
             if np.isfinite(bx[i]) and np.isfinite(by[i]):
                 x, y = int(bx[i] * scale), int(by[i] * scale)
                 if seen[i]:
@@ -261,8 +300,17 @@ def video_tables(cfg, labels, tracking, public_gt=False):
         gt = pd.read_csv(os.path.join(cfg["paths"]["official_repo"], GT_FILE))["label"].to_numpy()
         frames["GT"] = gt
         shown = ["GT", "modelo"]
+    T = None
+    blocks = games.half_video_blocks("BAR-ATH")
     if cfg["context"]["keepers"]["enabled"]:
-        T, _ = keeper_teams(tracking, games.half_video_blocks("BAR-ATH"), cfg)
+        T, _ = keeper_teams(tracking, blocks, cfg)
+    if (cfg["context"].get("jersey") or {}).get("enabled"):
+        # same team as the labeller uses: shirt colour, goalkeepers by their goal
+        from possession import jersey
+        shirt, _ = jersey.team_by_shirt(tracking, blocks, cfg, verbose=False)
+        if shirt is not None:
+            T = shirt if T is None else np.where(T != tracking["team"][None, :], T, shirt)
+    if T is not None:
         t = T[players["frame"].to_numpy(), players["slot"].to_numpy() - 1]
         players["team"] = pd.Categorical(np.where(t == 0, "H", "A"))
     return frames, players, shown
@@ -292,6 +340,6 @@ def render_blocks(cfg, labels, tracking):
                 continue
             path = os.path.join(out_dir, name + ("_GT" if len(shown) > 1 else "") + ".mp4")
             make_video(sel, players, cfg, path, mode=vc["mode"], scale=vc["scale"],
-                       minimap=vc["minimap"], label_col=shown, progress_every=0)
+                       minimap=vc["minimap"], label_col=shown, progress_every=0, view=tracking.get("broadcast_view"))
             written.append(path)
     return written

@@ -16,6 +16,9 @@ src/possession/
   broadcast.py           tracking del broadcast: alineación con el táctico, plano en directo y balón
   context.py             el etiquetador: evidencias por frame + Viterbi sobre {H, A, D}
   control.py             modelo aprendido de qué equipo controla el balón
+  jersey.py              equipo de cada track por el color de la camiseta en el vídeo táctico
+  dead.py                modelo aprendido de balón muerto (opción apagada)
+  whistle.py             silbatos del árbitro en el audio del broadcast (descartado, apagado)
   diagnostics.py         comprobaciones sin ground truth (output.diagnostics: true)
   submission.py          escribe el CSV, validador oficial y tabla comparativa
   data_proc.py           cruza ATD + Smart Tagging + homografía en tablas (las usan los vídeos)
@@ -26,7 +29,7 @@ docs/technical_report.md documento técnico (entregable)
 
 ## Resultado
 
-En los 5 minutos públicos (solo comprobación, 17 posesiones): **macroF1 0,938 y spellF1 0,710**.
+En los 5 minutos públicos (solo comprobación, 17 posesiones): **macroF1 0,935 y spellF1 0,723**.
 La mejor baseline oficial (`baseline_smooth125`) da 0,581 y 0,424.
 
 Las decisiones no se han tomado con esa cifra, sino en un banco de validación con otros partidos
@@ -100,9 +103,11 @@ elige la secuencia más probable del partido entero, con un coste por cada cambi
   cuenta como reanudación.
 - Saque falso: un golpeo no reanuda si el balón vuelve a pararse en menos de 6 s sin que lo toque
   un segundo jugador (el portero que lo coloca, devolverlo al sitio).
-- Balón falso: un balón quieto y solo mientras todos corren es un error del tracking, no una parada.
 - Un tramo D necesita alguna razón; si solo hay jugadores lentos, pasa a vivo.
 - Con el balón visible, reanudar solo es barato en el momento de un golpeo.
+- Recorte de los bordes de las paradas: en los bancos, las paradas que decide el etiquetador
+  empiezan 0,3-0,5 s antes y se reanudan 0,1-0,25 s después que en el ground truth. Tras decidir,
+  el inicio de cada parada se retrasa 0,3 s y la reanudación se adelanta 0,15 s.
 
 **¿Qué equipo?**
 - Modelo de control (`control.py`): una red pequeña promediada con un modelo lineal, que estima
@@ -116,9 +121,14 @@ elige la secuencia más probable del partido entero, con un coste por cada cambi
   cambia la posesión.
 - Porteros: el tracking a veces intercambia sus identidades; su equipo se fija por la portería
   que defienden.
-- Jugador solapado: cuando el tracking pierde a un jugador tapado por un rival, se mantiene como
-  "fantasma" pegado a ese rival hasta que vuelve a detectarse (máximo 10 s).
-- Donde no se ve el balón: modelo de forma de los equipos (anchura, profundidad, avance; 2.ª
+- Camiseta (`jersey.py`): cuando dos rivales se solapan, el tracker a veces da el track al
+  equipo contrario y un jugador pasa a contar como rival. Cada 0,2 s se lee del vídeo táctico el
+  color del torso de cada track; un modelo color -> equipo se ajusta con el equipo de los
+  metadatos como objetivo (ninguna etiqueta humana) y, por track, se decide el equipo más
+  probable en el tiempo. Corrige 240 tramos (1,5 % del tiempo de track). La primera ejecución
+  lee el vídeo (~10 min) y deja las muestras en `cache/`.
+- Donde no se ve el balón: el modelo de control sigue opinando con poco peso (0,1 por frame, solo
+  con la posición de los equipos), más el modelo de forma de los equipos (anchura, profundidad, avance; 2.ª
   pasada, entrenado con los frames de contacto claro) y, débil, las fases del Smart Tagging.
 - Balón parado con equipo en el tag: ese equipo saca.
 
@@ -129,7 +139,7 @@ balón), sin el retraso de un filtro causal.
 ## Qué aporta el broadcast (`src/possession/broadcast.py`)
 
 La base es siempre el tracking táctico: ningún jugador se añade ni se mueve. Del broadcast se
-toman dos cosas.
+toman tres cosas.
 
 1. **Alineación.** Las dos grabaciones no están sincronizadas. Como ambos trackings están en
    coordenadas de campo, el desfase es el que pone el balón del broadcast encima del balón del
@@ -139,7 +149,14 @@ toman dos cosas.
    primeros planos y planos de grada. Queda el 61 % del partido.
 3. **Balón donde el táctico no lo ve.** En esos frames en directo se usa el balón del broadcast si
    falta el del táctico (3,8 % del partido).
-4. **La realización como motivo de parada.** La TV corta a repeticiones y primeros planos sobre
+4. **Segunda opinión sobre quién tiene el balón.** El táctico pierde a veces a un jugador cuando
+   se solapa con un rival, o le da el track al equipo contrario; la otra cámara suele verlo bien.
+   Por eso el modelo de control se aplica también a lo que ve el broadcast por sí solo (su balón,
+   sus jugadores, sus equipos) y, donde las dos cámaras ven el balón, se promedian las dos
+   evidencias, con el táctico pesando más (`control.second_view_weight: 0.3`). Las cámaras discrepan sobre el equipo en el 7 %
+   de esos frames. No se copian jugadores de una cámara a la otra: emparejarlos falla justo en
+   los duelos.
+5. **La realización como motivo de parada.** La TV corta a repeticiones y primeros planos sobre
    todo con el balón parado: está fuera del plano general en el 50-66 % de los frames claramente
    parados y en el 12 % de los claramente vivos. Una parada que pasa más de la mitad de su
    duración en corte de TV tiene motivo y no se convierte en juego vivo. Recupera, por ejemplo,
@@ -155,19 +172,54 @@ diferencias emparejadas por partido y semilla. El banco no forma parte de este r
 
 | Cambio | Efecto en spellF1 (banco) |
 |---|---|
-| Reglas de balón parado (hueco, parada mínima, saque desde la línea, saque falso, balón falso, solapados) | +0,018 a +0,045 según la condición, 11-12 de 12 ejecuciones mejores |
-| Realización de TV como motivo de parada (TV simulada con las tasas medidas en BAR-ATH) | +0,005 con tags, +0,011 a +0,014 sin tags |
+| Modelo de control aprendido (10 partidos ajenos) frente a la cercanía al balón | 0,583 -> 0,629 |
+| Evidencia de equipo en los huecos (`gap_weight` 0,1) | +0,002 |
+| Saque desde la línea | +0,002 a +0,003 |
+| Hueco que es parada (a 10 m) | +0,027 a +0,029 |
+| Balón del broadcast donde falta el del táctico | +0,019 a +0,023 (optimista: el banco tiene el doble de juego vivo sin balón que nuestro partido) |
+| Parada mínima de 3 s y "reanudar exige juego" | +0,005 a +0,008 |
+| Realización de TV como motivo de parada | +0,005 |
+| Recorte de los bordes de las paradas | +0,003 a +0,004 |
+| Segunda opinión del broadcast, peso 0,3 (dos cámaras simuladas: cada una pierde a sus jugadores en los duelos y da algunos tracks al equipo contrario; el balón del broadcast tiene errores grandes el 10 % del tiempo) | +0,005 a +0,011 en las cuatro condiciones, 9 a 12 de 12 ejecuciones mejores |
 
-El balón del broadcast no se puede medir en el banco, que no tiene segunda cámara. Se ha
-comprobado en el propio partido sin etiquetas: escondiendo el balón del táctico en tramos donde
-las dos cámaras lo ven, el del broadcast recupera el 96 % de las etiquetas dentro del hueco
-(sin rellenar, el 74 %).
+El banco simula el broadcast (su balón, la realización de TV y, para la segunda opinión, sus
+jugadores) con tasas medidas sin etiquetas en nuestro partido. La segunda opinión se probó con
+pesos 0,3 / 0,5 / 0,7; 0,3 es el más constante entre condiciones.
 
-Lo que más nota cuesta en el banco son los huecos del balón; los jugadores perdidos por el
-tracking apenas influyen. Por eso del broadcast se toma el balón y no jugadores.
+Lo que el banco no puede medir se ha comprobado en el propio partido, sin etiquetas humanas:
 
-Los comentarios de `config.yaml` citan `EXPERIMENTS.md` y scripts de `validation/`: son del banco
-y tampoco están en este repositorio.
+| Métrica sin etiquetas | Qué mide | Resultado |
+|---|---|---|
+| Esconder y rellenar | Se esconde el balón del táctico en tramos donde las dos cámaras lo ven y se compara con las etiquetas del táctico completo | El balón del broadcast recupera el 96-97 % de las etiquetas dentro del hueco; sin rellenar, el 72-78 % |
+| Testigo independiente | El broadcast tiene su propio tracker: si un arreglo del táctico lo acerca a lo que ve el broadcast, es que acierta | Donde la camiseta cambia la decisión del táctico (0,9 % de los frames), el broadcast da la razón a la camiseta el 72,5 % de las veces |
+| Consenso antes y después | Cuando las cámaras discrepan, se mira qué equipo tenía el balón con acuerdo claro de ambas justo antes y justo después | Error del táctico solo 4,5 %, del broadcast solo 4,1 %, de la media 3,6 % (anclas a 4 s) |
+
+**Balón perdido.** El táctico no ve el balón en el 40,7 % de los frames evaluados, pero casi todo
+son paradas: no hay huecos de entre 0,5 y 5 s (el tracker ya los rellena) y el 90 % de los frames
+sin balón quedan como balón muerto. Juego vivo sin balón del táctico son unos 270 s del partido,
+y en el 55 % de ellos el broadcast sí lo ve. Ahí se usa el balón del broadcast con los jugadores
+del táctico; usar en su lugar solo lo que ve el broadcast no reproduce mejor las etiquetas
+(96-97 % frente a 97 %).
+
+Los comentarios de `config.yaml` citan `EXPERIMENTS.md` (con números como #27 o #44) y scripts
+de `validation/`: son el registro de experimentos y el banco, que viven en las ramas de trabajo
+y no en `main`. Las opciones marcadas "SIN VALIDAR" están apagadas.
+
+## Seis ideas probadas y descartadas (código presente, opciones apagadas)
+
+Se implementaron seis ideas más, cada una detrás de su opción en `config.yaml`. Ninguna pasa la
+validación, así que todas están apagadas y la entrega no cambia.
+
+| # | Idea | Opción | Por qué está apagada |
+|---|---|---|---|
+| 1 | Silbato del árbitro en el audio del broadcast (`whistle.py`) | `context.whistle.enabled` | Los "silbatos" que detecta no caen más cerca de los saques ni de los balones fuera que frames al azar (8 % frente a 13,5 %; 9 % frente a 8 %): el detector no distingue el silbato del ruido del estadio |
+| 2 | Golpeos y pases que ve el broadcast donde el táctico no vio ninguno | `context.passes.second_view_weight` | Banco: +0,001 a +0,002 con las semillas 0-3, pero −0,001 a +0,001 con las 4-7: no se confirma |
+| 3 | Sin evidencia de equipo con el balón por el aire | `context.control.air_neutral` | El banco no simula balones aéreos, así que no se puede medir; quita evidencia en el 15 % de los frames con los dos balones |
+| 4 | Camiseta también en los tracks del broadcast | `context.jersey.broadcast` | El banco no tiene vídeo, así que no se puede medir |
+| 5 | Peso de la segunda opinión según cuánto coinciden las cámaras | `context.control.second_view_reliability.enabled` | Banco: −0,0001 a −0,0021 en las cuatro condiciones |
+| 6 | Toque visto por las dos cámaras a la vez | `context.passes.two_camera_touch.enabled` | Banco: entre −0,0005 y +0,0012 (ruido); solo encuentra 5 toques en BAR-ATH |
+
+Con las seis encendidas a la vez, los 5 minutos públicos bajaban de 0,935 / 0,723 a 0,931 / 0,697.
 
 ## Vídeos de revisión
 
@@ -181,7 +233,9 @@ video:
 
 `python run.py` escribe `outputs/videos/<parte>T_<nº>_<desde>-<hasta>.mp4`, bloques de 5 minutos
 de reloj de partido (`1T_01_00m00-04m59.mp4`, ...). Cada vídeo muestra el vídeo táctico con el
-tracking encima (círculos azules H, rojos A, balón amarillo, cruz gris = último balón visto), un
+tracking encima (círculos azules H, rojos A, balón amarillo, cruz gris = último balón visto;
+cuadrados con "TV" = jugadores que solo ve el broadcast, rombo = balón que solo ve el broadcast;
+los colores son los del equipo ya corregido por la camiseta), un
 minimapa y **nuestra etiqueta en grande arriba a la derecha** con el color del equipo (gris = D).
 Cada bloque tarda ~1 minuto y ocupa ~120 MB. La primera vez se construyen las tablas de
 `data_proc.py` en `cache/` (~30 s). Necesita `opencv-python-headless`.

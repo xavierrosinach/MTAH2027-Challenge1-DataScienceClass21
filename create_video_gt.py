@@ -54,7 +54,7 @@ def main():
     out = args.out or os.path.join(cfg["paths"]["output_dir"], "videos", "GT_vs_{}.mp4".format(stem))
     vc = cfg["video"]
     make_video(sel, players, cfg, out, mode=vc["mode"], scale=vc["scale"], minimap=vc["minimap"],
-               label_col=shown, progress_every=0)
+               label_col=shown, progress_every=0, view=tracking.get("broadcast_view"))
 
 
 if __name__ == "__main__":
