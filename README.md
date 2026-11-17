@@ -29,8 +29,11 @@ docs/technical_report.md documento técnico (entregable)
 
 ## Resultado
 
-En los 5 minutos públicos (solo comprobación, 17 posesiones): **macroF1 0,935 y spellF1 0,723**.
+En los 5 minutos públicos (solo comprobación, 17 posesiones): **macroF1 0,934 y spellF1 0,764**
+(16 posesiones predichas). Con el modelo de control anterior (v6) daba 0,935 y 0,723.
 La mejor baseline oficial (`baseline_smooth125`) da 0,581 y 0,424.
+
+`python run.py --no-public` escribe el CSV con SHA256 `ed310554…`.
 
 Las decisiones no se han tomado con esa cifra, sino en un banco de validación con otros partidos
 (ver "Cómo se ha validado").
@@ -114,7 +117,9 @@ elige la secuencia más probable del partido entero, con un coste por cada cambi
   qué equipo controla el balón a partir de las distancias al balón y del movimiento de los
   jugadores respecto a él. Está entrenado en 10 partidos ajenos (3 de Metrica y 7 de IDSSE) con el
   tracking degradado para que se parezca al nuestro; nunca ha visto BAR-ATH. Sustituye a la
-  simple cercanía al balón.
+  simple cercanía al balón. Versión v8 (`models/control_v8_*.json`): al entrenar se añaden copias
+  de los mismos partidos con un tracking menos degradado (condición `light` del banco), que tienen
+  más cambios de posesión limpios para aprender.
 - Pases completados: toque de un jugador y control de un compañero a >= 5 m; dos seguidos bastan
   para una posesión corta. Cuentan los pases de primeras; un roce corto del rival no los corta.
 - Quien golpea el balón da evidencia a su equipo: decide quién saca, pero un despeje solo no
@@ -173,6 +178,7 @@ diferencias emparejadas por partido y semilla. El banco no forma parte de este r
 | Cambio | Efecto en spellF1 (banco) |
 |---|---|
 | Modelo de control aprendido (10 partidos ajenos) frente a la cercanía al balón | 0,583 -> 0,629 |
+| Modelo de control v8: entrenado también con copias `light` (frente al v6) | light +0,008/+0,009, degraded +0,001/+0,002, degraded+tags +0,001/+0,003, GT grueso −0,005/0,000; macroF1 +0,0008 (dos bancos, tres rondas cada uno) |
 | Evidencia de equipo en los huecos (`gap_weight` 0,1) | +0,002 |
 | Saque desde la línea | +0,002 a +0,003 |
 | Hueco que es parada (a 10 m) | +0,027 a +0,029 |
