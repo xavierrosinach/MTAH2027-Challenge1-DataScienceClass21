@@ -1,91 +1,56 @@
-"""Build the submission CSV from the data and config.yaml (optionally, the review videos).
+"""Build the submission CSV (one H / A / D / X label per video frame) from the match data.
 
-    python run.py
+    python run.py                       # uses config.yaml
     python run.py --config other.yaml
-    python run.py --no-public      # no public-window table, no videos; prints the CSV's SHA256
 """
 
 import argparse
+import hashlib
 import os
 import sys
-
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "src"))
 
 from possession.config import load_config  # noqa: E402
 
+GAME = "BAR-ATH"
 
-def possession_labels(tracking, cfg, verbose):
-    """Labels H / A / D per frame (src/possession/context.py) and the labeller's extras."""
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--config", default=os.path.join(HERE, "config.yaml"))
+    args = parser.parse_args()
+
+    cfg = load_config(args.config)
+    # imported after load_config, which puts the official games.py on the path
     import games
     from possession import context
-    from possession.data import load_smart_tagging
+    from possession.data import load_smart_tagging, load_tracking
+    from possession.submission import mark_ungraded, validate, write_csv
 
-    game = tracking["game"]
-    blocks = games.half_video_blocks(game)
+    tracking = load_tracking(cfg, GAME)
+    tags = load_smart_tagging(cfg, GAME)
+    blocks = games.half_video_blocks(GAME)
     ball = context.interpolate_ball(tracking["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
-    tags = load_smart_tagging(cfg, game)
 
-    # period of each frame: only "2nd_half_pre_kickoff" is used (FAQ: always D)
+    # FAQ: every graded frame before the 2nd-half kick-off is D
     period = np.full(len(ball), "", dtype=object)
     second = [b for b in blocks if b[0] == 2][0]
     period[second[1]:cfg["context"]["second_half_kickoff_frame"]] = "2nd_half_pre_kickoff"
 
-    labels, extra = context.label(tracking, ball, tags, cfg, blocks, frame_period=period,
-                                  verbose=verbose)
-    extra.update(tags=tags, blocks=blocks)
-    return labels, extra
+    labels = context.label(tracking, ball, tags, cfg, blocks, frame_period=period, verbose=cfg["output"]["verbose"])
+    labels = mark_ungraded(labels, GAME)
 
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--config", default=os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
-    parser.add_argument("--no-public", action="store_true",
-                        help="never print the public 5-minute table nor make videos (agents, "
-                             "hash checks); prints the SHA256 of the CSV instead")
-    args = parser.parse_args()
-
-    cfg = load_config(args.config)
-    # after load_config: these need games.py on the path
-    from possession.data import load_tracking
-    from possession.submission import compare, mark_ungraded, validate, write_csv
-
-    out = cfg["output"]
-    tracking = load_tracking(cfg)
-    labels, extra = possession_labels(tracking, cfg, verbose=out["verbose"])
-
-    if out["diagnostics"]:
-        from possession import context
-        from possession.diagnostics import print_report, report
-        passes = context.completed_passes(extra["features"], cfg)
-        print_report(report(labels, extra["features"], extra["tags"], extra["blocks"],
-                            extra["p_dead"], passes))
-
-    if out["ungraded_as_x"]:
-        labels = mark_ungraded(labels, tracking["game"])
-    sub_dir = os.path.join(cfg["paths"]["output_dir"], "submissions")
-    path = write_csv(os.path.join(sub_dir, "{}.csv".format(cfg["team_name"])), labels)
+    path = os.path.join(cfg["paths"]["output_dir"], "submissions", cfg["team_name"] + ".csv")
+    write_csv(path, labels)
     counts = {k: int(np.sum(labels == k)) for k in "HADX"}
     print("written {}   H {H}  A {A}  D {D}  X {X}".format(path, **counts))
+    with open(path, "rb") as handle:
+        print("SHA256 {}".format(hashlib.sha256(handle.read()).hexdigest()))
 
-    official = cfg["paths"]["official_repo"]
-    if out["validate"] and not validate(path, official):
-        sys.exit("CSV failed validation")
-    if args.no_public:
-        import hashlib
-        with open(path, "rb") as handle:
-            print("SHA256 {}".format(hashlib.sha256(handle.read()).hexdigest()))
-        return
-    if out["compare_public"]:
-        compare(sub_dir, os.path.join(cfg["paths"]["output_dir"], "scores"), official,
-                bootstrap=out["bootstrap"])
-
-    if cfg["video"]["enabled"]:
-        from possession.video import render_blocks
-        render_blocks(cfg, labels, tracking)
-
+    if cfg["output"]["validate"] and not validate(path, cfg["paths"]["official_repo"]):
+        sys.exit("CSV failed the official validation")
 
 if __name__ == "__main__":
     main()

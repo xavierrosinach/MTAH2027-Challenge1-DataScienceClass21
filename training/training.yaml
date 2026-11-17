@@ -1,0 +1,34 @@
+# CONFIGURATION OF THE TRAINING OF THE CONTROL MODEL (models/control_*.json)
+# Units: m = metres, s = seconds.
+
+metrica_dir: ../external/metrica-sample-data    # METRICA SAMPLE GAMES (git clone https://github.com/metrica-sports/sample-data)
+idsse_dir: ../external/idsse                    # IDSSE GAMES (python training/idsse.py download, then parse)
+games: [Sample_Game_1, Sample_Game_2, Sample_Game_3, IDSSE_J03WMX, IDSSE_J03WN1, IDSSE_J03WOH, IDSSE_J03WOY, IDSSE_J03WPY, IDSSE_J03WQQ, IDSSE_J03WR9]
+
+degrade:                                        # MAKE THE CLEAN TRACKING LOOK LIKE THE BAR-ATH ONE
+  enabled: true
+  seeds: [0, 1, 2, 3]
+  noise_m: 0.0                                  # NOISE ON EVERY POSITION
+  players:                                      # PLAYER TRACKS CUT IN FRAGMENTS
+    enabled: true
+    fragment_median_s: 35                       # MEDIAN FRAGMENT DURATION
+    gap_median_s: 1.0                           # MEDIAN GAP BETWEEN FRAGMENTS
+  ball_noise:                                   # SMOOTH NOISE ON THE BALL
+    sigma_m: 1.2
+    corr_s: 1.0
+  ball_lost_early_s: 0.6                        # LONG BALL GAPS START EARLIER
+  ball_live_gaps:                               # EXTRA BALL GAPS IN LIVE PLAY
+    per_min: 0.5
+    median_s: 8.0
+
+suite:                                          # OTHER DEGRADATIONS
+  light: {degrade: {ball_noise: {sigma_m: 0.6}, ball_lost_early_s: 0.0, ball_live_gaps: {per_min: 0.0}}}
+
+train:
+  seeds: [100, 101]                             # DEGRADATION SEEDS OF THE TRAINING COPIES
+  mix: [light]                                  # EXTRA TRAINING COPIES DEGRADED AS THESE CONDITIONS
+  l2: 1.0                                       # REGULARISATION OF THE LINEAR MODELS
+  weight_power: 0.25                            # EACH FRAME WEIGHS (length of its possession)^-0.25
+  mlp: {hidden: 16, epochs: 4, l2: 0.001, lr: 0.002, batch: 2048, seed: 0}   # NEURAL NETWORK
+  out_mlp: models/control_mlp.json              # NETWORK + LINEAR MODEL FOR BALL GAPS
+  out_lin: models/control_lin.json              # LINEAR MODELS

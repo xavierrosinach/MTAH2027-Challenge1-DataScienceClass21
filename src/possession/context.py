@@ -1,39 +1,28 @@
-"""Context labeller: dead-ball model + team evidence + Viterbi over {H, A, D}.
+"""Possession labeller: per-frame evidence for H / A / D, decoded with Viterbi.
 
-Why: the ball is missing on 41% of graded frames, in long stretches (median gap ~11 s). A
-frame-by-frame "nearest team" rule has nothing to say there, and a causal hysteresis switches
-~switch_frames late at every hand-over. This module instead
+The ball is missing on ~41 % of the graded frames, often for many seconds, so a frame-by-frame "nearest team" rule has nothing to say on much of the match. Instead:
 
-1. builds per-frame features that exist with or without a ball (player speeds, time since the
-   ball was seen, where it was last / next seen, Smart Tagging),
-2. learns P(dead ball) with a logistic regression trained on *algorithmic pseudo-labels*
-   (ball clearly out of the pitch, start of a SET PIECES tag, 2nd-half pre-kickoff = dead;
-   ball moving at a player's feet in the middle of the pitch = live). No human labels, no GT.
-3. turns the ball-player geometry and the Smart Tagging phases into team log-likelihoods (the
-   geometry through a model of who controls the ball learnt on other games: control.py),
-4. decodes the whole match at once with Viterbi, with a cost for every change of state. Being
-   non-causal, the change lands where the evidence changes instead of N frames later, and a
-   possession survives a ball gap unless something says otherwise ("possession stays with the
-   last team that had it").
+1. per-frame features that exist with or without a ball (player speeds, time since the ball was seen, where it was last / next seen, Smart Tagging);
+2. P(dead ball) from a logistic regression trained on *algorithmic pseudo-labels* of this match (ball clearly out, start of a SET PIECES tag, 2nd-half pre-kick-off = dead; ball moving at a player's feet in the middle of the pitch = live), plus rules on where the ball is;
+3. team evidence (H vs A) from a model of who controls the ball, learnt on other games (control.py), completed passes, kicks and Smart Tagging;
+4. Viterbi over the whole half, with a cost for every change of state: the change lands where the evidence changes, and a possession survives a ball gap unless something says otherwise;
+5. three corrective passes (team shape where the ball is missing, stoppages without a reason, restarts without play) and a final trim of the stoppage edges.
 
-All constants live in config.yaml (section `context`) and are set from physical reasoning and
-looking at the data, never from the public ground truth.
+No human label of this match is used anywhere. All constants are in config.yaml (`context`).
 """
 
 import os
 import warnings
-
 import numpy as np
 
 H, A, D = 0, 1, 2
-ATTACK_CODES = ("PROGRESSION", "BUILD UP", "BALL IN FINAL THIRD", "ATTACKING TRANSITION",
-                "CREATING CHANCES", "BALL IN THE BOX", "LONG BALL")
+FPS = 25
+ATTACK_CODES = ("PROGRESSION", "BUILD UP", "BALL IN FINAL THIRD", "ATTACKING TRANSITION", "CREATING CHANCES", "BALL IN THE BOX", "LONG BALL")
 
-
-# --- helpers
-
+# HELPERS
 def interpolate_ball(ball, max_gap):
     """Linear interpolation of ball gaps up to max_gap frames."""
+
     if max_gap <= 0:
         return ball
     ball = ball.copy()
@@ -49,9 +38,9 @@ def interpolate_ball(ball, max_gap):
         ball[start + 1:end] = ball[start] + t * (ball[end] - ball[start])
     return ball
 
-
 def rolling_nanmean(x, half_window):
     """Centred mean over +/- half_window frames, ignoring NaN."""
+
     ok = ~np.isnan(x)
     c_val = np.concatenate(([0.0], np.cumsum(np.where(ok, x, 0.0))))
     c_n = np.concatenate(([0], np.cumsum(ok)))
@@ -61,53 +50,39 @@ def rolling_nanmean(x, half_window):
     with np.errstate(invalid="ignore", divide="ignore"):
         return np.where(n > 0, (c_val[hi] - c_val[lo]) / n, np.nan)
 
-
 def ffill_index(mask):
     """Index of the last True at or before each frame (-1 if none)."""
+
     idx = np.where(mask, np.arange(len(mask)), -1)
     return np.maximum.accumulate(idx)
 
-
 def bfill_index(mask):
     """Index of the next True at or after each frame (len if none)."""
+
     n = len(mask)
     idx = np.where(mask, np.arange(n), n)
     return np.minimum.accumulate(idx[::-1])[::-1]
 
-
 def edge_distance_m(x, y, pitch):
     """Distance (m) from a 0-1 position to the nearest pitch line; negative outside."""
+
     length, width = pitch
     return np.minimum.reduce([x * length, (1 - x) * length, y * width, (1 - y) * width])
 
+def spells(labels, first, last):
+    """[(start, end)] runs of equal labels inside one half (end exclusive, absolute frames)."""
 
-# --- features
+    seg = labels[first:last + 1]
+    change = np.flatnonzero(seg[1:] != seg[:-1]) + 1
+    return list(zip(np.r_[0, change] + first, np.r_[change, len(seg)] + first))
 
-def tag_arrays(tags, n):
-    """Per frame: attacking-phase votes for H and A, and frames since a SET PIECES tag started."""
-    vote_h, vote_a = np.zeros(n), np.zeros(n)
-    for row in tags.itertuples():
-        if row.code in ATTACK_CODES and row.team in ("H", "A"):
-            target = vote_h if row.team == "H" else vote_a
-            target[max(0, row.start_frame):min(n, row.end_frame)] += 1
-    sp_start = np.zeros(n, dtype=bool)
-    for s in tags.loc[tags["code"] == "SET PIECES", "start_frame"]:
-        if 0 <= s < n:
-            sp_start[s] = True
-    last = ffill_index(sp_start)
-    since_sp = np.where(last >= 0, np.arange(n) - last, 10 ** 6)
-    return vote_h, vote_a, since_sp
-
-
+# TEAMS
 def keeper_teams(tracking, blocks, cfg):
     """(N, S) team of each slot per frame, with goalkeeper tracks fixed by the goal they guard.
 
-    The tracker sometimes swaps the identities of the two goalkeepers, so the home keeper's
-    slot turns up in the away goal. A goalkeeper slot is one that spends more than
-    `share` of a half within `depth_m` of one goal line. On every frame it is given to the team
-    that defends the goal it is nearer to (from where each team's outfield players stand in
-    that half). Other slots keep the team in the metadata.
+    The tracker sometimes swaps the identities of the two goalkeepers. A goalkeeper slot is one that spends more than `share` of a half within `depth_m` of one goal line; on every frame it is given to the team that defends the goal it is nearer to. Other slots keep their metadata team.
     """
+
     c = cfg["context"]["keepers"]
     P, team = tracking["players"], tracking["team"]
     length = tracking["pitch"][0]
@@ -134,145 +109,65 @@ def keeper_teams(tracking, blocks, cfg):
                 T[first:last + 1, s] = new
     return T, fixed
 
+def frame_teams(tracking, blocks, cfg, shirt=None):
+    """Team of each slot per frame: goalkeepers by their goal, everybody else by shirt colour (jersey.py) when available, else the metadata."""
+    c = cfg["context"]
+    team_frame = None
+    if c["keepers"]["enabled"]:
+        team_frame, _ = keeper_teams(tracking, blocks, cfg)
+    if shirt is None:
+        return team_frame
+    if team_frame is None:
+        return shirt
+    return np.where(team_frame != tracking["team"][None, :], team_frame, shirt)
 
-def occlusion_ghosts(tracking, cfg):
-    """Keep a player who vanishes behind a rival: a "ghost" that travels with that rival.
+# FEATURES
+def tag_arrays(tags, n):
+    """Per frame: attacking-phase votes for H and A, and frames since a SET PIECES tag started."""
 
-    An automatic tracker loses one of two players who overlap in the image and keeps a single
-    detection for the pair. The lost one has not left: he is still beside the rival that hides
-    him. Without him, a duel for the ball looks like one team alone on it.
-
-    A slot that disappears with a rival within `radius_m` (both seen on the frame before, the
-    rival still seen after) becomes a ghost at the same offset from that rival. If the rival's
-    track ends too, the ghost passes to a slot of the rival's team within `radius_m` (the pair is
-    still there under a new identity). The ghost ends when
-      - a seen slot of its own team is within `release_m` of it (he is tracked again),
-      - a slot of its own team is born within `reborn_m` of it (he was re-acquired),
-      - there is nobody left to follow, or after `max_s`.
-    No identity is ever re-assigned: when the pair splits into two tracks of the same team we do
-    not know which one is the hidden player, so the ghost just stays with the pair.
-
-    Returns (tracking with extra ghost columns in players / speed / team / team_frame, number of
-    ghosts, total ghost frames).
-    """
-    c = cfg["context"]["occlusion"]
-    fps = 25
-    P, speed, team = tracking["players"], tracking["speed"], tracking["team"]
-    n, S = P.shape[:2]
-    T = tracking.get("team_frame")
-    if T is None:
-        T = np.repeat(team[None, :], n, axis=0).astype(np.int8)
-    scale = np.array(tracking["pitch"])
-    vis = ~np.isnan(P[:, :, 0])
-    born = vis.copy()
-    born[1:] &= ~vis[:-1]
-    born[0] = False
-    max_f = int(c["max_s"] * fps)
-
-    def nearest(t, s, want_team, also_seen_at):
-        """Nearest slot to s at frame t among those of `want_team` seen at t and at also_seen_at."""
-        d = np.hypot(*((P[t] - P[t, s]) * scale).T)
-        d[(T[t] != want_team) | ~vis[t] | ~vis[also_seen_at]] = np.inf
-        d[s] = np.inf
-        o = int(np.argmin(d))
-        return o, d[o]
-
-    ghosts = []                                         # (first, last + 1, team, xy, speed)
-    for t, s in zip(*np.nonzero(vis[:-1] & ~vis[1:])):  # seen at t, gone at t + 1
-        g = int(T[t, s])
-        o, d = nearest(t, s, 1 - g, t + 1)
-        if not d < c["radius_m"]:
-            continue
-        off = P[t, s] - P[t, o]
-        start, limit = t + 1, min(n, t + 1 + max_f)
-        xy, sp, u = [], [], t + 1
-        while u < limit:
-            gone = np.flatnonzero(~vis[u:limit, o])
-            stop = u + int(gone[0]) if len(gone) else limit
-            xy.append(P[u:stop, o] + off)
-            sp.append(speed[u:stop, o])
-            u = stop
-            if u >= limit:
-                break
-            o2, d = nearest(u - 1, o, int(T[u - 1, o]), u)   # the rival's track ended: who is there?
-            if not d < c["radius_m"]:
-                break
-            off = off + P[u - 1, o] - P[u - 1, o2]
-            o = o2
-        xy, sp = np.concatenate(xy), np.concatenate(sp)
-        seg = slice(start, start + len(xy))
-        dist = np.hypot(*np.moveaxis((P[seg] - xy[:, None, :]) * scale, -1, 0))
-        dist = np.where(np.isnan(dist), np.inf, dist)
-        same = (T[seg] == g) & vis[seg]
-        over = ((same & (dist < c["release_m"])) | (same & born[seg] & (dist < c["reborn_m"]))).any(axis=1)
-        keep = int(np.argmax(over)) if over.any() else len(xy)
-        if keep > 0:
-            ghosts.append((start, start + keep, g, xy[:keep], sp[:keep]))
-
-    # ghosts that overlap in time need different columns (each column has one team)
-    free_at, col_team, placed = [], [], []
-    for first, end, g, xy, sp in ghosts:
-        for k in range(len(free_at)):
-            if col_team[k] == g and free_at[k] <= first:
-                break
-        else:
-            k = len(free_at)
-            free_at.append(0)
-            col_team.append(g)
-        free_at[k] = end
-        placed.append(k)
-    K = len(free_at)
-    P2 = np.concatenate([P, np.full((n, K, 2), np.nan)], axis=1)
-    speed2 = np.concatenate([speed, np.full((n, K), np.nan, dtype=speed.dtype)], axis=1)
-    for (first, end, g, xy, sp), k in zip(ghosts, placed):
-        P2[first:end, S + k] = xy
-        speed2[first:end, S + k] = sp
-    extra = np.array(col_team, dtype=np.int8)
-    out = dict(tracking)
-    out.update(players=P2, speed=speed2, team=np.concatenate([team, extra]).astype(np.int8),
-               team_frame=np.concatenate([T, np.repeat(extra[None, :], n, axis=0)], axis=1))
-    return out, len(ghosts), int(sum(end - first for first, end, *_ in ghosts))
-
+    vote_h, vote_a = np.zeros(n), np.zeros(n)
+    for row in tags.itertuples():
+        if row.code in ATTACK_CODES and row.team in ("H", "A"):
+            target = vote_h if row.team == "H" else vote_a
+            target[max(0, row.start_frame):min(n, row.end_frame)] += 1
+    sp_start = np.zeros(n, dtype=bool)
+    for s in tags.loc[tags["code"] == "SET PIECES", "start_frame"]:
+        if 0 <= s < n:
+            sp_start[s] = True
+    last = ffill_index(sp_start)
+    since_sp = np.where(last >= 0, np.arange(n) - last, 10 ** 6)
+    return vote_h, vote_a, since_sp
 
 def false_kicks(seen, ball_speed, ball, pitch, near_slot, near_d, cfg):
     """Frames of kicks that do not put the ball in play: the ball is moved, not played.
 
-    During a stoppage the ball is thrown back, rolled to the spot or placed by one player. That
-    looks like a kick (fast ball inside the pitch), but nobody else plays it and it comes to
-    rest again. A real restart is followed by play: a second player touches the ball, or it is
-    still moving (or out, or lost from view) `max_s` later.
-
-    A kick is false when, within `max_s`, the ball is at rest (below `rest_speed` for `rest_s`)
-    and from the kick to that moment the only player within touch distance was the kicker (by
-    slot; if the tracker renames him the kick is kept, the safe side).
+    During a stoppage the ball is thrown back, rolled to the spot or placed by one player. That looks like a kick, but nobody else plays it and it comes to rest again. A kick is false when, within `max_s`, the ball is at rest (below `rest_speed` for `rest_s`) and from the kick to that moment the only player within touch distance was the kicker.
     """
-    c = (cfg["context"].get("restart_check") or {})
+
+    c = cfg["context"]["restart_check"]
     out = np.zeros(len(seen), dtype=bool)
-    if not (c.get("enabled") and c.get("kicks", True)):
+    if not c["enabled"]:
         return out
-    fps, n = 25, len(seen)
+    n = len(seen)
     cb, cp = cfg["context"]["ball_dead"], cfg["context"]["passes"]
     edge = edge_distance_m(ball[:, 0], ball[:, 1], pitch)
     inside = seen & (edge > cb["inside_m"])
-    if cb.get("kick_from_line"):
-        # same kicks as ball_dead_llr: a ball on a line that moves into the pitch (a keeper
-        # rolling the ball in to place it looks exactly like that, and is checked here too)
+    if cb["kick_from_line"]:
+        # a ball on a line that moves into the pitch (corner, throw-in, goal kick)
         later = np.r_[edge[10:], np.full(10, np.nan)]
         with np.errstate(invalid="ignore"):
             inside = inside | (seen & (edge > 0) & (later > edge + 0.5))
     kick = inside & (np.nan_to_num(ball_speed) > cb["kick_speed"])
     still = seen & (np.nan_to_num(ball_speed, nan=99.0) < c["rest_speed"])
-    rest_f, max_f = int(c["rest_s"] * fps), int(c["max_s"] * fps)
-    # frames where a rest of rest_f frames begins
+    rest_f, max_f = int(c["rest_s"] * FPS), int(c["max_s"] * FPS)
     run = np.concatenate(([0], np.cumsum(still)))
-    rest_start = np.zeros(n, dtype=bool)
+    rest_start = np.zeros(n, dtype=bool)                  # a rest of rest_f frames begins here
     rest_start[:n - rest_f] = (run[rest_f:n] - run[:n - rest_f]) == rest_f
     touch = seen & (near_d < cp["touch_m"])
     k = np.flatnonzero(kick)
     if not len(k):
         return out
-    groups = np.split(k, np.flatnonzero(np.diff(k) > 5) + 1)      # one kick = nearby fast frames
-    for g in groups:
+    for g in np.split(k, np.flatnonzero(np.diff(k) > 5) + 1):    # one kick = nearby fast frames
         k0, k1 = int(g[0]), int(g[-1])
         before = np.flatnonzero(touch[max(0, k0 - 12):k0 + 3])
         if not len(before):
@@ -289,46 +184,30 @@ def false_kicks(seen, ball_speed, ball, pitch, near_slot, near_d, cfg):
         out[k0:k1 + 1] = True
     return out
 
-
-def restart_gaps(seen, ball, pitch, cfg, tv_away=None):
+def restart_gaps(seen, ball, pitch, cfg):
     """Ball gaps that are a stoppage: the ball comes back where it went missing.
 
-    In live play a ball that is not seen for seconds reappears far away (it was in the air or
-    being carried). After a foul or an offside it is put down at the spot and play restarts from
-    there. So a gap of at least `min_s` whose ball reappears within `max_move_m` of where it was
-    lost is a free kick being taken, and the gap is dead time. Returns the frames of those gaps.
-    On the bench games (other matches) gaps of 3 s or more are a stoppage 76-100 % of the time
-    when the ball moved under 10 m, and 0-40 % when it moved over 10 m in under 5 s.
+    In live play a ball unseen for seconds reappears far away. After a foul or an offside it is put down at the spot, so a gap of at least `min_s` whose ball reappears within `max_move_m` of where it was lost is dead time.
     """
-    c = (cfg["context"].get("gap_restart") or {})
+
+    c = cfg["context"]["gap_restart"]
     out = np.zeros(len(seen), dtype=bool)
-    if not c.get("enabled"):
+    if not c["enabled"]:
         return out
-    need_tv = c.get("min_tv_away")
-    if need_tv is not None and tv_away is None:
-        raise ValueError("gap_restart.min_tv_away needs broadcast.enabled")
     m = np.diff(np.concatenate(([0], (~seen).astype(np.int8), [0])))
     scale = np.array(pitch)
     for s, e in zip(np.flatnonzero(m == 1), np.flatnonzero(m == -1)):
-        if s == 0 or e >= len(seen) or (e - s) < c["min_s"] * 25:
+        if s == 0 or e >= len(seen) or (e - s) < c["min_s"] * FPS:
             continue
-        # in live play the TV stays on the live wide shot; a stoppage usually has a cut-away
-        if need_tv is not None and tv_away[s:e].mean() < need_tv:
-            continue
-        move = np.hypot(*((ball[e] - ball[s - 1]) * scale))
-        # also: a ball whose net speed over the gap is below a slow jog went nowhere with play
-        slow = c.get("max_speed") is not None and move / ((e - s) / 25) < c["max_speed"]
-        if move < c["max_move_m"] or slow:
+        if np.hypot(*((ball[e] - ball[s - 1]) * scale)) < c["max_move_m"]:
             out[s:e] = True
     return out
-
 
 def frame_features(tracking, ball, tags, cfg):
     """Per-frame features (dict of arrays) shared by the dead-ball model and the team evidence."""
     n = len(ball)
     pitch = tracking["pitch"]
     length, width = pitch
-    fps = 25
     players, speed = tracking["players"], tracking["speed"]
     team = tracking.get("team_frame", tracking["team"][None, :])   # (N, S) or (1, S)
 
@@ -345,14 +224,14 @@ def frame_features(tracking, ball, tags, cfg):
     bn = ball[np.clip(next_i, 0, n - 1)]
     edge_last = np.where(has_last, edge_distance_m(bl[:, 0], bl[:, 1], pitch), 0.0)
     edge_next = np.where(has_next, edge_distance_m(bn[:, 0], bn[:, 1], pitch), 0.0)
-    t_since = np.where(has_last, np.arange(n) - last_i, 10 ** 6) / fps
-    t_until = np.where(has_next, next_i - np.arange(n), 10 ** 6) / fps
+    t_since = np.where(has_last, np.arange(n) - last_i, 10 ** 6) / FPS
+    t_until = np.where(has_next, next_i - np.arange(n), 10 ** 6) / FPS
 
     # ball speed (m/s) from positions 4 frames apart, NaN when not seen at both ends
     k = 4
     disp = np.full(n, np.nan)
     d = (ball[k:] - ball[:-k]) * np.array([length, width])
-    disp[k:] = np.hypot(d[:, 0], d[:, 1]) * fps / k
+    disp[k:] = np.hypot(d[:, 0], d[:, 1]) * FPS / k
 
     # nearest player of each team (m)
     diff = (players - ball[:, None, :]) * np.array([length, width])
@@ -361,97 +240,72 @@ def frame_features(tracking, ball, tags, cfg):
     d_h = np.where(team == 0, dist, np.inf).min(axis=1)
     d_a = np.where(team == 1, dist, np.inf).min(axis=1)
 
-    # who is on the ball: nearest slot within touch_m of a seen ball (-1 = nobody)
+    # who is on the ball: nearest slot within touch_m of a seen ball, no rival within contest_m
     near_slot = np.argmin(dist, axis=1)
     near_d = dist[np.arange(n), near_slot]
     cp = cfg["context"]["passes"]
-    team_full = np.broadcast_to(team, dist.shape)
-    near_team = team_full[np.arange(n), near_slot]
-    d_rival = np.where(near_team == 0, d_a, d_h)          # nearest opponent of that player
+    near_team = np.broadcast_to(team, dist.shape)[np.arange(n), near_slot]
+    d_rival = np.where(near_team == 0, d_a, d_h)
     clean = seen & (near_d < cp["touch_m"]) & (d_rival > cp["contest_m"])
     touch_slot = np.where(clean, near_slot, -1)
     touch_team = np.where(clean, near_team, -1)
 
     vote_h, vote_a, since_sp = tag_arrays(tags, n)
 
-    # where the ball was heading when last seen: position extrapolated `exit_pred_s` ahead with
-    # the velocity of its last 4 frames (NaN velocity -> no extrapolation)
+    # where the ball was heading when last seen: extrapolated `exit_pred_s` ahead
     c = cfg["context"]["ball_dead"]
     vel = np.full((n, 2), np.nan)
     vel[k:] = (ball[k:] - ball[:-k]) / k                       # per frame, 0-1 units
     vl = vel[np.clip(last_i, 0, n - 1)]
-    pred = bl + np.nan_to_num(vl) * c["exit_pred_s"] * fps
+    pred = bl + np.nan_to_num(vl) * c["exit_pred_s"] * FPS
     edge_pred = np.where(has_last, edge_distance_m(pred[:, 0], pred[:, 1], pitch), 0.0)
 
     # how long the (seen) ball has had nobody near it while rolling or still
     alone = (seen & (np.minimum(d_h, d_a) > c["isolated_m"])
              & (np.nan_to_num(disp, nan=99) < c["isolated_max_speed"]))
     start = ffill_index(~alone)
-    alone_s = np.where(alone, (np.arange(n) - start) / fps, 0.0)
-    # "abandoned": alone for isolated_s AND the players are not running. A lonely still ball
-    # while everybody runs is a false ball detection (a mark on the grass), not a stoppage.
-    abandoned = alone_s >= c["isolated_s"]
-    if c.get("isolated_backdate"):
-        # nobody went for it from the moment it was left alone: the stoppage starts there, not
-        # isolated_s later (the wait is only how long it takes to be sure)
-        run_s = np.where(alone, (bfill_index(~alone) - start - 1) / fps, 0.0)
-        abandoned = alone & (run_s >= c["isolated_s"])
-    if c.get("isolated_max_player_speed") is not None:
-        abandoned &= rolling_nanmean(spd, 2 * fps) < c["isolated_max_player_speed"]
+    alone_s = np.where(alone, (np.arange(n) - start) / FPS, 0.0)
 
     return {
         "seen": seen, "spd": spd,
-        "spd_2s": rolling_nanmean(spd, 2 * fps), "spd_6s": rolling_nanmean(spd, 6 * fps),
-        "seen_4s": rolling_nanmean(seen.astype(float), 4 * fps),
+        "spd_2s": rolling_nanmean(spd, 2 * FPS), "spd_6s": rolling_nanmean(spd, 6 * FPS),
         "edge_last": edge_last, "edge_next": edge_next,
         "t_since": t_since, "t_until": t_until,
         "ball_speed": disp, "d_h": d_h, "d_a": d_a,
         "vote_h": vote_h, "vote_a": vote_a, "since_sp": since_sp,
-        "edge_pred": edge_pred, "alone_s": alone_s, "abandoned": abandoned,
+        "edge_pred": edge_pred, "alone_s": alone_s, "abandoned": alone_s >= c["isolated_s"],
         "touch_slot": touch_slot, "touch_team": touch_team, "ball": ball,
         "near_slot": near_slot, "near_d": near_d,
         "false_kick": false_kicks(seen, disp, ball, pitch, near_slot, near_d, cfg),
-        "gap_restart": restart_gaps(seen, ball, pitch, cfg,
-                                    None if tracking.get("broadcast_live") is None
-                                    else ~tracking["broadcast_live"]),
+        "gap_restart": restart_gaps(seen, ball, pitch, cfg),
     }
 
-
-# --- dead-ball model
-
+# DEAD BALL EVIDENCE
 def design_matrix(f):
-    """Features for the dead-ball logistic regression: how the players move.
+    """Inputs of the dead-ball regression: how the players move.
 
-    Deliberately excludes ball visibility and ball position: the pseudo-labels are defined from
-    those (live needs a seen ball, dead is mostly ball out / unseen), so a model given them
-    would only learn "no ball => dead". Ball position enters separately in `ball_dead_llr`.
+    Ball visibility and position are left out on purpose: the pseudo-labels are defined from them, so a model given them would only learn "no ball => dead". They enter in `ball_dead_llr`.
     """
-    clip = np.clip
-    cols = [clip(f["spd_2s"], 0, 5), clip(f["spd_6s"], 0, 5)]
-    if "tv_away" in f:                          # context.tv_dead (broadcast): share of the window away
-        cols.append(clip(f["tv_away"], 0, 1))
-    return np.column_stack(cols)
-
+    return np.column_stack([np.clip(f["spd_2s"], 0, 5), np.clip(f["spd_6s"], 0, 5)])
 
 def ball_dead_llr(f, cfg):
     """Rule-based dead-ball log-odds from where the ball is, or was last seen."""
+
     c = cfg["context"]["ball_dead"]
     llr = np.zeros(len(f["seen"]))
     out_now = f["seen"] & (f["edge_last"] < -c["out_m"])
     inside_now = f["seen"] & (f["edge_last"] > c["inside_m"])
     llr[out_now] += c["out_llr"]
     llr[inside_now] -= c["inside_llr"]
-    # in a gap that started with the ball out, or with the ball last seen heading out fast
-    # enough to cross a line within exit_pred_s: play stays stopped until the ball is seen again
+    # a gap that started with the ball out, or heading out fast enough to cross a line
     gap_after_out = ~f["seen"] & ((f["edge_last"] < 0) | (f["edge_pred"] < -c["out_m"]))
     llr[gap_after_out] += c["gap_after_out_llr"]
-    # ball left alone (nobody within isolated_m, not flying) for isolated_s: nobody is playing it
+    # ball left alone (nobody near, not flying) for a while: nobody is playing it
     llr[f["abandoned"]] += c["isolated_llr"]
     # ball kicked inside the pitch: play is (re)starting
     kicked = inside_now & (np.nan_to_num(f["ball_speed"]) > c["kick_speed"]) & ~f["false_kick"]
-    if c.get("kick_from_line"):
-        # corners, throw-ins and goal kicks start ON a line: the ball is fast but still within
-        # inside_m of it. It is a kick into play if the ball is inside and moving away from the line.
+    if c["kick_from_line"]:
+        # corners, throw-ins and goal kicks start ON a line: inside and moving away from it
         edge = np.where(f["seen"], f["edge_last"], np.nan)
         later = np.r_[edge[10:], np.full(10, np.nan)]
         with np.errstate(invalid="ignore"):
@@ -461,25 +315,22 @@ def ball_dead_llr(f, cfg):
     if f["gap_restart"].any():
         llr[f["gap_restart"]] += cfg["context"]["gap_restart"]["llr"]
     # once the ball has gone out, play stays stopped until it is kicked again (the restart),
-    # even if the ball is seen back inside: the keeper carrying it to the six-yard box, a player
-    # placing it, a ball boy throwing a new one in
+    # even if the ball is seen back inside (carried, placed, a new ball thrown in)
     went_out = out_now | gap_after_out
     last_out, last_kick = ffill_index(went_out), ffill_index(kicked)
     since = np.arange(len(llr)) - last_out
     latched = ((last_out >= 0) & (last_out > last_kick) & ~went_out
-               & (since <= c["latch_max_s"] * 25))
+               & (since <= c["latch_max_s"] * FPS))
     llr[latched & inside_now] += c["inside_llr"]        # being inside says nothing here
     llr[latched] += c["latch_llr"]
     return llr
 
-
 def goal_dead_mask(f, ball, tags, pitch, cfg):
     """True from a goal to the kick-off that follows it.
 
-    A "Kick Off (After Goal)" SET PIECES tag means a goal was scored before it. Players run to
-    celebrate, so speed says nothing; the stoppage starts at the last sighting of the ball near
-    a goal (inside a penalty-box-sized zone) before the tag, at most `goal_lookback_s` earlier.
+    A "Kick Off (After Goal)" SET PIECES tag means a goal was scored before it. The stoppage starts at the last sighting of the ball near a goal before the tag (at most `goal_lookback_s` earlier).
     """
+
     c = cfg["context"]["goal"]
     length, width = pitch
     n = len(ball)
@@ -490,33 +341,32 @@ def goal_dead_mask(f, ball, tags, pitch, cfg):
                      & (np.abs(ball[:, 1] - 0.5) * width < c["zone_half_width_m"]))
     kicks = tags[(tags["code"] == "SET PIECES") & (tags["type"] == "Kick Off (After Goal)")]
     for k in kicks["start_frame"]:
-        lo = max(0, k - int(c["goal_lookback_s"] * 25))
+        lo = max(0, k - int(c["goal_lookback_s"] * FPS))
         hits = np.flatnonzero(near_goal[lo:k])
         if len(hits):
             mask[lo + hits[-1] + 1:min(n, k)] = True
     return mask
 
-
 def pseudo_labels(f, frame_period, cfg):
     """1 = dead, 0 = live, -1 = unknown. Rules only, no human decision about any frame."""
+
     c = cfg["context"]["pseudo"]
-    n = len(f["seen"])
-    y = np.full(n, -1, dtype=np.int8)
+    y = np.full(len(f["seen"]), -1, dtype=np.int8)
     out_now = f["seen"] & (f["edge_last"] < -c["out_m"])
     live = (f["seen"] & (f["edge_last"] > c["live_edge_m"])
             & (np.minimum(f["d_h"], f["d_a"]) < c["live_near_m"])
             & (np.nan_to_num(f["ball_speed"]) > c["live_ball_speed"])
-            & (f["since_sp"] > c["set_piece_s"] * 25 * 2))
-    dead = out_now | (f["since_sp"] < c["set_piece_s"] * 25)
+            & (f["since_sp"] > c["set_piece_s"] * FPS * 2))
+    dead = out_now | (f["since_sp"] < c["set_piece_s"] * FPS)
     if frame_period is not None:
         dead |= frame_period == "2nd_half_pre_kickoff"
     y[live] = 0
     y[dead] = 1
     return y
 
-
 def fit_logistic(X, y, l2=1.0, iters=50):
     """Class-balanced L2 logistic regression by Newton's method. Returns (mean, std, w)."""
+
     mu, sd = X.mean(axis=0), X.std(axis=0) + 1e-9
     Z = np.column_stack([np.ones(len(X)), (X - mu) / sd])
     sw = np.where(y == 1, 0.5 / max(1, (y == 1).sum()), 0.5 / max(1, (y == 0).sum())) * len(y)
@@ -531,68 +381,53 @@ def fit_logistic(X, y, l2=1.0, iters=50):
             break
     return mu, sd, w
 
-
 def predict_logistic(model, X):
     mu, sd, w = model
     Z = np.column_stack([np.ones(len(X)), (X - mu) / sd])
     return 1 / (1 + np.exp(-Z @ w))
 
-
-# --- emissions and decoding
-
+# TEAM EVIDENCE
 def add_team_llr(e, llr):
-    """H-vs-A log-odds (positive = H) that say nothing about dead vs alive.
+    """Add H-vs-A log-odds (positive = H) that say nothing about dead vs alive.
 
-    Only the disfavoured team is penalised, so the favoured one keeps its score against D: a
-    player standing on the ball to take a free kick says who restarts, not that play is live.
+    Only the disfavoured team is penalised, so the favoured one keeps its score against D: a player standing on the ball to take a free kick says who restarts, not that play is live.
     """
+    
     e[:, H] -= np.maximum(0.0, -llr)
     e[:, A] -= np.maximum(0.0, llr)
 
+def emissions(f, p_dead, cfg, proximity=True):
+    """(N, 3) log-likelihood scores for H, A, D (up to a per-frame constant)."""
 
-def emissions(f, p_dead, cfg, proximity=True, dead_llr=None):
-    """(N, 3) log-likelihood scores for H, A, D (up to a per-frame constant).
-
-    dead_llr: dead-vs-alive evidence from the learnt model (dead.py) replacing the default one."""
     c = cfg["context"]
-    n = len(p_dead)
-    e = np.zeros((n, 3))
+    e = np.zeros((len(p_dead), 3))
 
-    # dead vs alive
-    if dead_llr is not None:
-        e[:, D] += dead_llr
-    else:
-        p = np.clip(p_dead, 1e-3, 1 - 1e-3)
-        llr_dead = np.clip(np.log(p / (1 - p)), -c["dead_llr_clip"], c["dead_llr_clip"])
-        e[:, D] += c["dead_weight"] * llr_dead + ball_dead_llr(f, cfg)
+    # dead vs alive: learnt from player movement + rules on the ball
+    p = np.clip(p_dead, 1e-3, 1 - 1e-3)
+    llr_dead = np.clip(np.log(p / (1 - p)), -c["dead_llr_clip"], c["dead_llr_clip"])
+    e[:, D] += c["dead_weight"] * llr_dead + ball_dead_llr(f, cfg)
 
-    # ball at a player's feet: exp(-d/scale) per team, team share weighted by how close anyone is
-    # (off when the learnt control model replaces it)
+    # nearest team to the ball (off when the learnt control model replaces it)
     s = c["ball"]["scale_m"]
-    w_h, w_a = np.exp(-f["d_h"] / s), np.exp(-f["d_a"] / s)    # 0 when inf (no ball / no players)
+    w_h, w_a = np.exp(-f["d_h"] / s), np.exp(-f["d_a"] / s)
     tot = w_h + w_a
     with np.errstate(invalid="ignore", divide="ignore"):
         share_h = np.where(tot > 0, w_h / tot, 0.5)
     strength = c["ball"]["weight"] * np.maximum(w_h, w_a) * proximity
-    # loose ball (nobody in contact): exactly no evidence, possession stays with the last team
-    strength[np.minimum(f["d_h"], f["d_a"]) > c["ball"]["contact_m"]] = 0.0
-    team_llr = strength * np.log(np.clip(share_h, 0.02, 0.98) / np.clip(1 - share_h, 0.02, 0.98))
-    add_team_llr(e, team_llr)
+    strength[np.minimum(f["d_h"], f["d_a"]) > c["ball"]["contact_m"]] = 0.0   # loose ball
+    add_team_llr(e, strength * np.log(np.clip(share_h, 0.02, 0.98)
+                                      / np.clip(1 - share_h, 0.02, 0.98)))
 
-    # Smart Tagging attacking phases (weak, coarse in time): only while the ball is not seen,
-    # where there is nothing better; with a visible ball the geometry decides
-    tag = c["tag_weight"] * np.sign(f["vote_h"] - f["vote_a"]) * ~f["seen"]
-    add_team_llr(e, tag)
+    # Smart Tagging attacking phases (weak, coarse in time): only while the ball is not seen
+    add_team_llr(e, c["tag_weight"] * np.sign(f["vote_h"] - f["vote_a"]) * ~f["seen"])
     return e
-
 
 def home_attack_sign(tracking, blocks):
     """+1 on the frames of a block where the home team attacks towards x = 1, -1 towards x = 0.
 
-    Relative reading, as in keeper_teams: the team whose players stand nearer x = 0 on average
-    over the block defends x = 0. (Reading "home mean x < 0.5" fails when the home team spends a
-    half pushed past the half-way line.) Frames outside the blocks get +1.
+    The team whose players stand nearer x = 0 on average over the block defends x = 0. Frames outside the blocks get +1.
     """
+
     P, team = tracking["players"], tracking["team"]
     sign = np.ones(len(P))
     with warnings.catch_warnings():
@@ -603,18 +438,17 @@ def home_attack_sign(tracking, blocks):
             sign[first:last + 1] = 1 if home_x < away_x else -1
     return sign
 
-
 def team_shape_features(tracking, blocks, smooth_frames):
     """Per frame, how each team is laid out and moving, with x towards its attacking goal.
 
-    The team with the ball stretches and pushes up; the other compacts and drops. None of these
-    use the ball, so they still speak while it is missing.
+    The team with the ball stretches and pushes up; the other compacts and drops. None of these use the ball, so they still speak while it is missing.
     """
+
     P, speed = tracking["players"], tracking["speed"]
     team = tracking.get("team_frame", tracking["team"][None, :])
     length, width = tracking["pitch"]
     n = len(P)
-    sign = home_attack_sign(tracking, blocks)          # +1: home attacks towards x = 1
+    sign = home_attack_sign(tracking, blocks)
 
     cols = []
     with warnings.catch_warnings():
@@ -637,63 +471,42 @@ def team_shape_features(tracking, blocks, smooth_frames):
     F = np.nan_to_num(F, nan=0.0)
     return np.column_stack([rolling_nanmean(F[:, j], smooth_frames) for j in range(F.shape[1])])
 
-
-def shape_evidence(tracking, f, labels, graded, blocks, cfg, verbose):
-    """H-vs-A log-odds from team shape, learnt from frames where the first pass is sure.
-
-    Pseudo-labels: frames with the ball seen, the labelled team within own_m of it and the
-    other team farther than opp_m. Checked with a blocked (by time) cross-validation.
-    """
+def shape_evidence(tracking, f, labels, graded, blocks, cfg):
+    """H-vs-A log-odds from team shape, learnt on this match from frames where the first pass is sure: ball seen, the labelled team within own_m of it and the other team beyond opp_m."""
+    
     c = cfg["context"]["shape"]
-    F = team_shape_features(tracking, blocks, int(c["smooth_s"] * 25))
+    F = team_shape_features(tracking, blocks, int(c["smooth_s"] * FPS))
     d_own = np.where(labels == "H", f["d_h"], f["d_a"])
     d_opp = np.where(labels == "H", f["d_a"], f["d_h"])
     sure = (graded & f["seen"] & np.isin(labels, ["H", "A"])
             & (d_own < c["own_m"]) & (d_opp > c["opp_m"]))
     y = (labels == "H").astype(float)
     idx = np.flatnonzero(sure)
-
-    if verbose:
-        folds = np.array_split(idx, 10)
-        acc = []
-        for k in range(10):
-            fit = np.concatenate([folds[j] for j in range(10) if j != k])
-            m = fit_logistic(F[fit], y[fit])
-            acc.append(np.mean((predict_logistic(m, F[folds[k]]) > 0.5) == (y[folds[k]] == 1)))
-        print("shape model: {} pseudo-labelled frames, blocked-CV accuracy {:.3f} +/- {:.3f}"
-              .format(len(idx), np.mean(acc), np.std(acc)))
-
     model = fit_logistic(F[idx], y[idx])
     p = np.clip(predict_logistic(model, F), 1e-3, 1 - 1e-3)
     return np.log(p / (1 - p))
 
-
 def touch_events(f, min_frames):
     """[(start, end, slot, team)] runs of the same player on the ball for >= min_frames."""
+
     ts, tt = f["touch_slot"], f["touch_team"]
     change = np.flatnonzero(ts[1:] != ts[:-1]) + 1
     starts, ends = np.r_[0, change], np.r_[change, len(ts)]
     return [(s, e, int(ts[s]), int(tt[s])) for s, e in zip(starts, ends)
             if ts[s] >= 0 and e - s >= min_frames]
 
-
 def completed_passes(f, cfg):
     """[(start, end, team)] ball going from one player to a different teammate.
 
-    The receiver must be on the ball for >= min_receive_frames (control); the passer may touch
-    it for as little as min_touch_frames (a first-time pass). Between the two, the ball travels
-    at least min_pass_m within max_gap_s, and no opponent has it for >= min_receive_frames;
-    a shorter opponent touch is a deflection that did not intercept, which per CHALLENGE.md
-    does not change possession. A touch needs no opponent within contest_m: in a crowded box
-    the nearest player flickers between defenders as the ball flies over them.
-    CHALLENGE.md names consecutive passes as a proxy for controlled possession; a short
-    recovery (win it, pass, lose it) shows up as one or two of these.
+    The receiver must be on the ball for >= min_receive_frames; the passer may touch it for as little as min_touch_frames (a first-time pass). The ball travels at least min_pass_m within max_gap_s, and no opponent has it for >= min_receive_frames in between (a shorter touch is a deflection, which does not change possession).
     """
+
     c = cfg["context"]["passes"]
     ev = touch_events(f, c["min_touch_frames"])
+
     def is_pass(a, b):
         (s0, e0, p0, t0), (s1, e1, p1, t1) = a, b
-        if t0 != t1 or p0 == p1 or s1 - e0 > c["max_gap_s"] * 25:
+        if t0 != t1 or p0 == p1 or s1 - e0 > c["max_gap_s"] * FPS:
             return False
         b0, b1 = f["ball"][e0 - 1], f["ball"][s1]
         return np.hypot((b1[0] - b0[0]) * 105.0, (b1[1] - b0[1]) * 68.0) >= c["min_pass_m"]
@@ -703,35 +516,27 @@ def completed_passes(f, cfg):
         s1, e1, p1, t1 = cur
         long_touch = e1 - s1 >= c["min_receive_frames"]
         if long_touch:
-            # from the last touch of any kind (a first-time interception that found a teammate),
-            # else from the last one that counts (skipping short opposing deflections)
+            # from the last touch of any kind, else from the last one that counts
             for src in (last, prev):
                 if src is not None and is_pass(src, cur):
                     out.append((src[0], e1, t1))
                     break
-        # a short touch by the other team is a deflection unless a teammate then controls the
-        # ball (handled above through `last`): it does not take over as `prev`
+        # a short touch by the other team is a deflection: it does not take over as `prev`
         if prev is None or long_touch or t1 == prev[3]:
             prev = cur
         last = cur
     return out
 
-
 def kicker_evidence(e, f, cfg):
     """Whoever kicks the ball gets kick_team_llr for their team over the kick.
 
-    A kick is the ball speeding up past kick_speed; the kicker is the player nearest to the ball
-    (within kicker_m) just before it. In open play one kick (a clearance) is less than a change
-    of possession; after a stoppage it says who restarts (throw-ins, whose tags carry no team).
+    The kicker is the player nearest to the ball (within kicker_m) just before it speeds up past kick_speed. In open play one kick (a clearance) is less than a change of possession; after a stoppage it says who restarts.
     """
+
     c = cfg["context"]["passes"]
-    ks = cfg["context"]["ball_dead"]["kick_speed"]
-    bs = np.nan_to_num(f["ball_speed"])
-    fast = f["seen"] & (bs > ks)
-    starts = np.flatnonzero(fast[1:] & ~fast[:-1]) + 1
+    fast = f["seen"] & (np.nan_to_num(f["ball_speed"]) > cfg["context"]["ball_dead"]["kick_speed"])
     llr = np.zeros(len(e))
-    n_kicks = 0
-    for k in starts:
+    for k in np.flatnonzero(fast[1:] & ~fast[:-1]) + 1:
         lo = max(0, k - 6)
         d = np.minimum(f["d_h"][lo:k], f["d_a"][lo:k])
         if not len(d) or not np.isfinite(d).any() or d.min() > c["kicker_m"]:
@@ -739,136 +544,71 @@ def kicker_evidence(e, f, cfg):
         j = lo + int(np.argmin(d))
         team = 0 if f["d_h"][j] <= f["d_a"][j] else 1
         llr[j:k + 1] += (c["kick_team_llr"] / (k + 1 - j)) * (1 if team == 0 else -1)
-        n_kicks += 1
     add_team_llr(e, llr)
-    return n_kicks
-
 
 def pass_evidence(e, f, cfg):
     """Spread pass_llr over each completed pass, against the other team."""
+
     c = cfg["context"]["passes"]
     llr = np.zeros(len(e))
-    passes = completed_passes(f, cfg)
-    for s, end, t in passes:
+    for s, end, t in completed_passes(f, cfg):
         llr[s:end] += (c["pass_llr"] / (end - s)) * (1 if t == 0 else -1)
     add_team_llr(e, llr)
-    return passes
-
-
-def unsupported_dead_spells(labels, f, ball, tags, pitch, blocks, frame_period, cfg):
-    """D spells with no sign of a stoppage other than slow players.
-
-    A spell is supported if any of these holds:
-      - the ball is seen outside the pitch during it (or just before), or it was last seen
-        within `line_m` of a line when it went missing;
-      - a SET PIECES tag starts during it, up to `sp_before_s` before or `sp_after_s` after
-        (the tag starts a few seconds before the restart, and the ball being placed can end
-        the spell early);
-      - play restarts on a line or on the centre spot: the first ball seen within
-        `restart_window_s` after the spell is within `line_m` of a line or `centre_m` of the spot;
-      - it lasts at least `long_s` (goals, injuries, substitutions);
-      - it is the 2nd-half pre-kickoff stretch.
-    """
-    c = cfg["context"]["dead_support"]
-    length, width = pitch
-    n = len(labels)
-    sp_starts = tags.loc[tags["code"] == "SET PIECES", "start_frame"].to_numpy()
-    look = int(c["restart_window_s"] * 25)
-    before = int(c["out_before_s"] * 25)
-    bad = []
-    for _, first, last in blocks:
-        lab = labels[first:last + 1]
-        change = np.flatnonzero(lab[1:] != lab[:-1]) + 1
-        starts, ends = np.r_[0, change] + first, np.r_[change, len(lab)] + first
-        for s, end in zip(starts, ends):
-            if labels[s] != "D":
-                continue
-            if frame_period is not None and (frame_period[s:end] == "2nd_half_pre_kickoff").any():
-                continue
-            if (end - s) >= c["long_s"] * 25:
-                continue
-            lo = max(0, s - before)
-            seen = f["seen"][lo:end]
-            if (seen & (f["edge_last"][lo:end] < 0)).any():
-                continue
-            if not f["seen"][s] and f["edge_last"][s] < c["line_m"]:
-                continue
-            # ball lost heading out, or left alone with nobody playing it
-            out_m = cfg["context"]["ball_dead"]["out_m"]
-            if (~f["seen"][lo:end] & (f["edge_pred"][lo:end] < -out_m)).any():
-                continue
-            if f["abandoned"][lo:end].any() or f["gap_restart"][lo:end].any():
-                continue
-            if ((sp_starts >= s - c["sp_before_s"] * 25)
-                    & (sp_starts < end + c["sp_after_s"] * 25)).any():
-                continue
-            nxt = np.flatnonzero(f["seen"][end:min(n, end + look)])
-            if len(nxt):
-                bx, by = ball[end + nxt[0]]
-                if edge_distance_m(bx, by, pitch) < c["line_m"]:
-                    continue
-                if np.hypot((bx - 0.5) * length, (by - 0.5) * width) < c["centre_m"]:
-                    continue
-            bad.append((s, end))
-    return bad
-
-
-def false_restarts(labels, f, blocks, cfg):
-    """Live spells between two stoppages in which one player kicks the ball to nobody.
-
-    D -> team -> D within `max_s`, the only player within touch distance of the ball in between
-    is one and the same, and the second stoppage starts with the ball alone (nobody within
-    isolated_m: it was not played to anyone and nobody went for it). He was sending the ball
-    back to the spot; play never restarted. A short real spell (a throw-in that goes straight
-    out, a corner headed away) ends with the ball out or among players, not alone on the grass.
-    Returns [(start, end)] to be made dead.
-    """
-    c = cfg["context"]["restart_check"]
-    touch = f["seen"] & (f["near_d"] < cfg["context"]["passes"]["touch_m"])
-    bad = []
-    for _, first, last in blocks:
-        lab = labels[first:last + 1]
-        change = np.flatnonzero(lab[1:] != lab[:-1]) + 1
-        starts, ends = np.r_[0, change] + first, np.r_[change, len(lab)] + first
-        for i in range(1, len(starts) - 1):
-            s, end = starts[i], ends[i]
-            if labels[s] == "D" or labels[s - 1] != "D" or labels[end] != "D":
-                continue
-            if (end - s) > c["max_s"] * 25 or not f["alone_s"][end] > 0:
-                continue
-            if len(np.unique(f["near_slot"][s:end][touch[s:end]])) <= 1:
-                bad.append((s, end))
-    return bad
-
 
 def restart_evidence(e, tags, cfg):
-    """SET PIECES with a team: that team restarts, so favour it just after the tag starts.
-
-    The tag starts a few seconds before the restart (players slowest ~2-4 s in, back to speed
-    by ~8 s), so the window is [delay, delay + length] seconds after the start.
-    """
+    """SET PIECES with a team: that team restarts. The tag starts a few seconds before the restart, so the window is [delay, delay + length] seconds after its start."""
+    
     c = cfg["context"]["restart"]
     n = len(e)
     for row in tags[tags["code"] == "SET PIECES"].itertuples():
         if row.team not in ("H", "A"):
             continue
-        lo = max(0, row.start_frame + int(c["delay_s"] * 25))
-        hi = min(n, lo + int(c["length_s"] * 25))
-        own, other = (H, A) if row.team == "H" else (A, H)
-        e[lo:hi, other] -= c["weight"]
+        lo = max(0, row.start_frame + int(c["delay_s"] * FPS))
+        hi = min(n, lo + int(c["length_s"] * FPS))
+        e[lo:hi, A if row.team == "H" else H] -= c["weight"]
 
+def control_evidence(tracking, ball, blocks, cfg, verbose):
+    """(H-vs-A log-odds, ball-seen mask) of the learnt control model (control.py).
 
+    With the broadcast tracking, the same model is also applied to what the broadcast camera sees by itself (its ball, players and teams); where both cameras see the ball the two log-odds are averaged (`second_view_weight` for the broadcast one). A player one camera loses in a duel, or gives to the other team, is usually right in the other.
+    """
+    
+    from . import control
+    from .config import REPO_ROOT
+
+    c = cfg["context"]
+    ctl = c["control"]
+    paths = [m if os.path.isabs(m) else os.path.join(REPO_ROOT, m)
+             for m in [ctl["model"]] + list(ctl.get("ensemble") or [])]
+    groups = tuple(ctl["features"])
+    llr, seen = control.control_llr(tracking, ball, blocks, paths, groups)
+    llr = np.clip(llr, -ctl["clip"], ctl["clip"])
+
+    view, w2 = tracking.get("broadcast_view"), float(ctl.get("second_view_weight") or 0.0)
+    if view is not None and w2 > 0:
+        v = dict(view)
+        team_frame = frame_teams(v, blocks, cfg)
+        if team_frame is not None:
+            v["team_frame"] = team_frame
+        vball = interpolate_ball(view["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
+        llr2, seen2 = control.control_llr(v, vball, blocks, paths, groups)
+        llr2 = np.clip(llr2, -ctl["clip"], ctl["clip"])
+        both = seen & seen2 & ~np.isnan(tracking["ball_tactical"][:, 0])
+        if verbose:
+            print("second view: both cameras see the ball on {:.0%} of the frames with ball; "
+                  "they disagree on the team on {:.1%} of those".format(
+                      both.sum() / max(1, seen.sum()),
+                      np.mean(np.sign(llr[both]) != np.sign(llr2[both]))))
+        llr = np.where(both, (1 - w2) * llr + w2 * llr2, llr)
+    return llr, seen
+
+# DECODING (VITERBI)
 def viterbi(e, team_switch, to_dead, from_dead, min_dead):
     """Max-score H/A/D path where every dead-ball stretch lasts at least min_dead frames.
 
-    States: 0 H, 1 A, then a chain D_1 ... D_k (k = min_dead): entering D lands on D_1, the chain
-    must be walked to D_k, and only D_k may stay or restart play. Without the minimum, a hop
-    H -> D -> A of one frame is cheaper than a direct hand-over whenever
-    to_dead + from_dead < team_switch, and every change of possession grows a fake stoppage.
-
-    from_dead may be a scalar or a per-frame array (the cost of restarting play at frame t), and
-    so may team_switch (the cost of a hand-over landing at frame t).
+    States: 0 H, 1 A, then a chain D_1 ... D_k (k = min_dead): entering D lands on D_1, the chain must be walked to D_k, and only D_k may stay or restart play. Without the minimum, a hop H -> D -> A of one frame would be cheaper than a direct hand-over and every change of possession would grow a fake stoppage. from_dead may be a per-frame array.
     """
+
     n, k = len(e), max(1, int(min_dead))
     eh, ea, ed = e[:, H].tolist(), e[:, A].tolist(), e[:, D].tolist()
     fd = (np.broadcast_to(np.asarray(from_dead, dtype=float), (n,))).tolist()
@@ -876,16 +616,14 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
     back_h = np.zeros(n, dtype=np.int8)     # 0 from H, 1 from A, 2 from D_k
     back_a = np.zeros(n, dtype=np.int8)
     back_d1 = np.zeros(n, dtype=np.int8)    # 0 from H, 1 from A
-    back_dk = np.zeros(n, dtype=np.int8)    # 0 from D_{k-1}, 1 from D_k (only if k > 1)
+    back_dk = np.zeros(n, dtype=np.int8)    # 0 from D_{k-1}, 1 from D_k
     NEG = -1e18
     sh, sa = eh[0], ea[0]
     chain = [NEG] * k
     chain[0] = ed[0]
     for t in range(1, n):
         dk = chain[-1]
-        # H
-        # ties go to the change: with no evidence either way, the change lands as late as
-        # possible, i.e. when the new team first touches the ball, not when the old one lost it
+        # ties go to the change: with no evidence either way, the change lands as late as possible, i.e. when the new team first touches the ball
         c0, c1, c2 = sh, sa - ts[t], dk - fd[t]
         if c0 > c1 and c0 > c2:
             nh, bh = c0, 0
@@ -893,7 +631,6 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
             nh, bh = c1, 1
         else:
             nh, bh = c2, 2
-        # A
         c0, c1, c2 = sa, sh - ts[t], dk - fd[t]
         if c0 > c1 and c0 > c2:
             na, ba = c0, 1
@@ -901,7 +638,6 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
             na, ba = c1, 0
         else:
             na, ba = c2, 2
-        # D chain
         enter_h, enter_a = sh - to_dead, sa - to_dead
         d1, b1 = (enter_h, 0) if enter_h >= enter_a else (enter_a, 1)
         if k == 1:
@@ -909,20 +645,17 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
                 new_chain, bk = [dk + ed[t]], 1
             else:
                 new_chain, bk = [d1 + ed[t]], 0
-            back_d1[t] = b1
         else:
             stay, step = chain[-1], chain[-2]
             last, bk = (stay, 1) if stay > step else (step, 0)
-            new_chain = [d1] + chain[:-2] + [last]
-            new_chain = [v + ed[t] for v in new_chain]
-            back_d1[t] = b1
+            new_chain = [v + ed[t] for v in [d1] + chain[:-2] + [last]]
+        back_d1[t] = b1
         back_h[t], back_a[t], back_dk[t] = bh, ba, bk
         sh, sa, chain = nh + eh[t], na + ea[t], new_chain
 
     # backtrack; state code: 0 H, 1 A, 2+i = D_{i+1}
     path = np.empty(n, dtype=np.int8)
-    finals = [sh, sa] + chain
-    s = int(np.argmax(finals))
+    s = int(np.argmax([sh, sa] + chain))
     for t in range(n - 1, -1, -1):
         path[t] = H if s == 0 else A if s == 1 else D
         if t == 0:
@@ -938,13 +671,13 @@ def viterbi(e, team_switch, to_dead, from_dead, min_dead):
                 s = 1 + k if back_dk[t] == 1 else int(back_d1[t])
             else:
                 s = 1 + k if back_dk[t] == 1 else k
-        else:                             # D_i, 1 < i < k, came from D_{i-1}
+        else:                             # D_i came from D_{i-1}
             s -= 1
     return path
 
+def decode(e, cost, blocks):
+    """Viterbi independently on each graded half; ungraded frames stay D. Returns labels."""
 
-def decode_by_half(e, cost, blocks):
-    """Viterbi independently on each graded half; ungraded frames stay D."""
     path = np.full(len(e), D, dtype=np.int8)
     for _, first, last in blocks:
         c = dict(cost)
@@ -952,40 +685,97 @@ def decode_by_half(e, cost, blocks):
             if np.ndim(c[key]):
                 c[key] = c[key][first:last + 1]
         path[first:last + 1] = viterbi(e[first:last + 1], **c)
-    return path
-
+    return np.array(["H", "A", "D"])[path]
 
 def restart_cost(f, cfg):
-    """Per-frame cost of restarting play: dearer while the ball is seen and not being kicked.
+    """Per-frame cost of restarting play: dearer while the ball is seen and nobody kicks it within +/- kick_window_s (the ball is being placed or carried, play has not restarted)."""
 
-    A restart is a kick (or throw). If the ball is visible and nobody kicks it within
-    +/- kick_window_s, play has not restarted yet: the ball is being placed or carried.
-    With the ball unseen there is no way to tell, so the plain cost applies.
-    """
     t = cfg["context"]["transition_cost"]
     c = cfg["context"]["ball_dead"]
-    w = int(t["kick_window_s"] * 25)
     kick = f["seen"] & (np.nan_to_num(f["ball_speed"]) > c["kick_speed"]) & ~f["false_kick"]
-    near_kick = rolling_nanmean(kick.astype(float), w) > 0
+    near_kick = rolling_nanmean(kick.astype(float), int(t["kick_window_s"] * FPS)) > 0
     cost = np.full(len(kick), float(t["from_dead"]))
     cost[f["seen"] & ~near_kick] += t["restart_without_kick"]
     return cost
 
+# CORRECTIVE PASSES
+def unsupported_dead_spells(labels, f, ball, tags, pitch, blocks, frame_period, tv_cut, cfg):
+    """D spells with no sign of a stoppage other than slow players.
+
+    A spell is supported if any of these holds: the ball is seen out (or lost on a line, heading out, left alone, or back where it was lost); a SET PIECES tag starts around it; play restarts on a line or on the centre spot; it lasts at least `long_s`; it is the 2nd-half pre-kick-off; or the TV spent most of it away from the live wide shot (replays, close-ups).
+    """
+
+    c = cfg["context"]["dead_support"]
+    length, width = pitch
+    n = len(labels)
+    sp_starts = tags.loc[tags["code"] == "SET PIECES", "start_frame"].to_numpy()
+    look = int(c["restart_window_s"] * FPS)
+    before = int(c["out_before_s"] * FPS)
+    out_m = cfg["context"]["ball_dead"]["out_m"]
+    bad = []
+    for _, first, last in blocks:
+        for s, end in spells(labels, first, last):
+            if labels[s] != "D":
+                continue
+            if frame_period is not None and (frame_period[s:end] == "2nd_half_pre_kickoff").any():
+                continue
+            if (end - s) >= c["long_s"] * FPS:
+                continue
+            lo = max(0, s - before)
+            if (f["seen"][lo:end] & (f["edge_last"][lo:end] < 0)).any():
+                continue
+            if not f["seen"][s] and f["edge_last"][s] < c["line_m"]:
+                continue
+            if (~f["seen"][lo:end] & (f["edge_pred"][lo:end] < -out_m)).any():
+                continue
+            if f["abandoned"][lo:end].any() or f["gap_restart"][lo:end].any():
+                continue
+            if ((sp_starts >= s - c["sp_before_s"] * FPS)
+                    & (sp_starts < end + c["sp_after_s"] * FPS)).any():
+                continue
+            nxt = np.flatnonzero(f["seen"][end:min(n, end + look)])
+            if len(nxt):
+                bx, by = ball[end + nxt[0]]
+                if edge_distance_m(bx, by, pitch) < c["line_m"]:
+                    continue
+                if np.hypot((bx - 0.5) * length, (by - 0.5) * width) < c["centre_m"]:
+                    continue
+            if tv_cut is not None and tv_cut[s:end].mean() >= cfg["context"]["tv_cut"]["support_share"]:
+                continue
+            bad.append((s, end))
+    return bad
+
+def false_restarts(labels, f, blocks, cfg):
+    """Live spells between two stoppages in which one player kicks the ball to nobody.
+
+    D -> team -> D within `max_s`, only one player touches the ball in between, and the second stoppage starts with the ball alone: he was sending the ball back to the spot, play never restarted. Returns [(start, end)] to be made dead.
+    """
+
+    c = cfg["context"]["restart_check"]
+    touch = f["seen"] & (f["near_d"] < cfg["context"]["passes"]["touch_m"])
+    bad = []
+    for _, first, last in blocks:
+        runs = spells(labels, first, last)
+        for i in range(1, len(runs) - 1):
+            s, end = runs[i]
+            if labels[s] == "D" or labels[s - 1] != "D" or labels[end] != "D":
+                continue
+            if (end - s) > c["max_s"] * FPS or not f["alone_s"][end] > 0:
+                continue
+            if len(np.unique(f["near_slot"][s:end][touch[s:end]])) <= 1:
+                bad.append((s, end))
+    return bad
 
 def trim_dead(labels, e, blocks, cfg):
-    """Shorten each decoded stoppage: its start start_s later, its restart end_s earlier (#44).
+    """Shorten each decoded stoppage: its start start_s later, its restart end_s earlier.
 
-    On both benches (Metrica, ground truth from events; IDSSE, ball status and possession from
-    the tracking as in the official ground truth) the decoded stoppages start ~0.35-0.4 s early
-    and end ~0.15-0.2 s late (validation/errors.py, signed timing). The trimmed frames take the
-    label of the neighbouring possession. Forced dead frames (goals, before the 2nd-half kick-off,
-    false restarts) are never trimmed, nor a stoppage that would get shorter than min_s, nor a
-    side with no possession next to it in the half.
+    On the validation games (other matches) the decoded stoppages start ~0.35-0.4 s early and end ~0.15-0.2 s late. The trimmed frames take the label of the neighbouring possession. Forced dead frames are never trimmed, nor a stoppage that would get shorter than min_s.
     """
-    c = cfg["context"].get("dead_trim") or {}
-    if not c.get("enabled"):
+
+    c = cfg["context"]["dead_trim"]
+    if not c["enabled"]:
         return labels
-    a_n, b_n, m_n = (int(round(c[k] * 25)) for k in ("start_s", "end_s", "min_s"))
+    a_n, b_n, m_n = (int(round(c[k] * FPS)) for k in ("start_s", "end_s", "min_s"))
     forced = e[:, D] >= 1e5
     out = labels.copy()
     for _, first, last in blocks:
@@ -1003,342 +793,86 @@ def trim_dead(labels, e, blocks, cfg):
                 out[hi - b_n:hi] = seg[t]
     return out
 
-
-def view_reliability(tracking, view, ball, vball, c):
-    """(N,) 0-1: how far the broadcast view can be trusted on each frame.
-
-    Two label-free checks of the moment: (1) around the ball (`radius_m`), the broadcast players
-    sit on tactical players (median distance to the nearest one: full trust below
-    `players_m[0]`, none above `players_m[1]`), which fails when its homography drifts; (2) the
-    two balls are in the same place (full trust below `ball_m[0]`, none above `ball_m[1]`)."""
-    scale = np.array(tracking["pitch"], dtype=float)
-    P1, P2 = tracking["players"], view["players"]
-    n = len(P1)
-    lo, hi = c["players_m"]
-    rel = np.zeros(n)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for a in range(0, n, 4000):
-            b = min(n, a + 4000)
-            q, t, bl = P2[a:b] * scale, P1[a:b] * scale, ball[a:b] * scale
-            near = np.hypot(q[:, :, 0] - bl[:, None, 0], q[:, :, 1] - bl[:, None, 1]) < c["radius_m"]
-            d = np.hypot(q[:, :, None, 0] - t[:, None, :, 0], q[:, :, None, 1] - t[:, None, :, 1])
-            d = np.nanmin(np.where(np.isnan(d), np.inf, d), axis=2)
-            d = np.where(near & np.isfinite(d), d, np.nan)
-            med = np.nanmedian(d, axis=1)
-            rel[a:b] = np.nan_to_num(np.clip((hi - med) / (hi - lo), 0.0, 1.0), nan=0.0)
-    lo, hi = c["ball_m"]
-    sep = np.hypot(*((vball - ball) * scale).T)
-    return rel * np.nan_to_num(np.clip((hi - sep) / (hi - lo), 0.0, 1.0), nan=0.0)
-
-
-def kick_pass_llr(f, cfg):
-    """(N,) H-vs-A log-odds of the kicker and completed-pass evidence of one camera."""
-    c = cfg["context"]["passes"]
-    z = np.zeros((len(f["seen"]), 3))
-    if c["kick_team_llr"] > 0:
-        kicker_evidence(z, f, cfg)
-    if c["pass_llr"] > 0:
-        pass_evidence(z, f, cfg)
-    return z[:, H] - z[:, A]
-
-
-def two_camera_touches(f, f2, ball, vball, pitch, c):
-    """(N,) H-vs-A log-odds from touches that both cameras see.
-
-    A touch changes the velocity of the ball. One camera alone mistakes tracking jitter for a
-    touch; two independent trackers do not jitter together. A touch here is a change of the
-    ball's velocity above `turn_ms` (between the `window_frames` before and after) in BOTH
-    cameras within `sync_frames`, with the two balls within `agree_m`, and with both cameras
-    naming the same team as the nearest player within `player_m`. That team gets `llr`."""
-    scale = np.array(pitch, dtype=float)
-    w = int(c["window_frames"])
-    n = len(ball)
-
-    def turn(b):
-        B = b * scale
-        t = np.full(n, np.nan)
-        after, before = (B[2 * w:] - B[w:-w]), (B[w:-w] - B[:-2 * w])
-        t[w:-w] = np.hypot(*(after - before).T) / w * 25
-        return t
-
-    def team_at(g, k):
-        dh, da = g["d_h"][k], g["d_a"][k]
-        if not min(dh, da) < c["player_m"]:
-            return None
-        return 0 if dh < da else 1
-
-    t1, t2 = turn(ball), turn(vball)
-    sy = int(c["sync_frames"])
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        t2 = np.nanmax(np.stack([np.roll(t2, k) for k in range(-sy, sy + 1)]), axis=0)
-    sep = np.hypot(*((vball - ball) * scale).T)
-    with np.errstate(invalid="ignore"):
-        cand = (t1 > c["turn_ms"]) & (t2 > c["turn_ms"]) & (sep < c["agree_m"])
-    llr = np.zeros(n)
-    half = int(c["spread_frames"])
-    edge = np.diff(np.r_[0, cand.astype(int), 0])
-    found = 0
-    for a, b in zip(np.flatnonzero(edge == 1), np.flatnonzero(edge == -1)):
-        k = a + int(np.argmax(t1[a:b]))
-        g1, g2 = team_at(f, k), team_at(f2, k)
-        if g1 is None or g1 != g2:
-            continue
-        llr[max(0, k - half):k + half + 1] += (1 if g1 == 0 else -1) * c["llr"] / (2 * half + 1)
-        found += 1
-    return llr, found
-
-
-def label(tracking, ball, tags, cfg, blocks, frame_period=None, verbose=True):
-    """Full context labeller. Returns labels (N,) in {'H','A','D'} and diagnostics."""
+# MAIN ENTRY POINT
+def label(tracking, ball, tags, cfg, blocks, frame_period=None, verbose=False):
+    """Labels (N,) in {'H', 'A', 'D'} for every frame (ungraded frames stay D)."""
     c = cfg["context"]
-    if c["keepers"]["enabled"]:
-        tracking = dict(tracking)
-        tracking["team_frame"], fixed = keeper_teams(tracking, blocks, cfg)
-        if verbose:
-            print("goalkeeper slots re-assigned by goal on {} slot-frames".format(fixed))
-    if (c.get("jersey") or {}).get("enabled"):
-        # team of each track from the shirt colour in the tactical video (src/possession/jersey.py)
+
+    # team of each track per frame: goalkeepers by their goal, the rest by shirt colour
+    shirt = None
+    if c["jersey"]["enabled"]:
         from . import jersey
         shirt, changed = jersey.team_by_shirt(tracking, blocks, cfg, verbose)
-        if shirt is not None:
-            tracking = dict(tracking)
-            by_goal = tracking.get("team_frame")
-            if by_goal is not None:                     # goalkeepers keep the team of their goal
-                shirt = np.where(by_goal != tracking["team"][None, :], by_goal, shirt)
-            tracking["team_frame"] = shirt
-            if verbose:
-                print("tracks given to the other team by shirt colour: {} ({:.0f} s)".format(
-                    len(changed), sum(b - a + 1 for _, a, b in changed) / 25))
-    if (c.get("occlusion") or {}).get("enabled"):
-        tracking, n_ghosts, ghost_frames = occlusion_ghosts(tracking, cfg)
-        if verbose:
-            print("players hidden behind a rival kept as ghosts: {} ({:.0f} s)".format(
-                n_ghosts, ghost_frames / 25))
-    ball_team, team_only = ball, (cfg.get("broadcast") or {}).get("fill_team_only", False)
-    if team_only:
-        # the broadcast ball speaks only for "who has it" (learnt control model); every dead-ball
-        # feature, rule and the team-shape mask keep the tactical ball (EXPERIMENTS.md #35)
-        if tracking.get("ball_tactical") is None:
-            raise ValueError("broadcast.fill_team_only needs broadcast.enabled and fill_ball")
-        ball = interpolate_ball(tracking["ball_tactical"], cfg["ball_gaps"]["interpolate_max_frames"])
+        if verbose and shirt is not None:
+            print("tracks given to the other team by shirt colour: {} ({:.0f} s)".format(
+                len(changed), sum(b - a + 1 for _, a, b in changed) / FPS))
+    team_frame = frame_teams(tracking, blocks, cfg, shirt)
+    if team_frame is not None:
+        tracking = dict(tracking, team_frame=team_frame)
+
+    # dead-ball model, fitted on this match's pseudo-labels
     f = frame_features(tracking, ball, tags, cfg)
-    tvd, tvr = c.get("tv_dead") or {}, c.get("tv_restart") or {}
-    tv_away = None
-    if tvd.get("enabled") or tvr.get("enabled"):
-        if tracking.get("broadcast_live") is None:
-            raise ValueError("context.tv_dead / tv_restart need broadcast.enabled")
-        tv_away = ~tracking["broadcast_live"]
-    if tvd.get("enabled"):
-        # TV away from the live shot (replays, close-ups) as one more input of the dead-ball
-        # model, whose weight is fitted on this match with the rule-made pseudo-labels
-        f["tv_away"] = rolling_nanmean(tv_away.astype(float), int(round(tvd["window_s"] * 25)))
-    X = design_matrix(f)
     y = pseudo_labels(f, frame_period, cfg)
     graded = np.zeros(len(y), dtype=bool)
     for _, first, last in blocks:
         graded[first:last + 1] = True
     train = graded & (y >= 0)
-    model = fit_logistic(X[train], y[train].astype(float))
-    p_dead = predict_logistic(model, X)
+    p_dead = predict_logistic(fit_logistic(design_matrix(f)[train], y[train].astype(float)), design_matrix(f))
 
-    ctl = c.get("control") or {"enabled": False}
-    view_tr = view_ball = None                          # the broadcast view, once prepared
-    dm = c.get("dead_model") or {"enabled": False}
-    learnt_dead = None
-    if dm["enabled"]:
-        # learnt dead-ball evidence (src/possession/dead.py), trained on other games
-        from . import dead
-        from .config import REPO_ROOT
-        dpath = dm["model"] if os.path.isabs(dm["model"]) else os.path.join(REPO_ROOT, dm["model"])
-        learnt_dead = dm["weight"] * np.clip(dead.dead_llr(f, ball_dead_llr(f, cfg), dpath),
-                                             -dm["clip"], dm["clip"])
-    e = emissions(f, p_dead, cfg, proximity=not (ctl["enabled"] and ctl["replace_proximity"]),
-                  dead_llr=learnt_dead)
+    ctl = c["control"]
+    e = emissions(f, p_dead, cfg, proximity=not (ctl["enabled"] and ctl["replace_proximity"]))
     if ctl["enabled"]:
-        # learnt "who controls the ball" (src/possession/control.py), trained on other games
-        from . import control
-        from .config import REPO_ROOT
-        paths = [m if os.path.isabs(m) else os.path.join(REPO_ROOT, m)
-                 for m in [ctl["model"]] + list(ctl.get("ensemble") or [])]
-        path = paths[0]
-        llr, seen = control.control_llr(tracking, ball_team, blocks, paths,
-                                        control.feature_groups(cfg))
-        llr = np.clip(llr, -ctl["clip"], ctl["clip"])
-        view, w2 = tracking.get("broadcast_view"), float(ctl.get("second_view_weight") or 0.0)
-        if view is not None and w2 > 0:
-            # second opinion: the same model on what the broadcast camera sees by itself (its
-            # ball, its players, its teams). Where both cameras see the ball the two log-odds
-            # are averaged (the tactical one weighs 1 - w2): a player one camera loses in a
-            # duel, or gives to the other team, is usually right in the other
-            v = dict(view)
-            shirt = view.get("team_shirt")
-            if c["keepers"]["enabled"]:
-                by_goal, _ = keeper_teams(v, blocks, cfg)
-                v["team_frame"] = by_goal if shirt is None else np.where(
-                    by_goal != view["team"][None, :], by_goal, shirt)
-            elif shirt is not None:
-                v["team_frame"] = shirt
-            if (c.get("occlusion") or {}).get("enabled"):
-                v, _, _ = occlusion_ghosts(v, cfg)
-            vball = interpolate_ball(view["ball"], cfg["ball_gaps"]["interpolate_max_frames"])
-            llr2, seen2 = control.control_llr(v, vball, blocks, paths, control.feature_groups(cfg))
-            llr2 = np.clip(llr2, -ctl["clip"], ctl["clip"])
-            own = tracking.get("ball_tactical")
-            both = seen & seen2 & ~np.isnan((tracking["ball"] if own is None else own)[:, 0])
-            if verbose:
-                print("second view (broadcast): both cameras see the ball on {:.0%} of the frames "
-                      "with ball; they disagree on the team on {:.1%} of those".format(
-                          both.sum() / max(1, seen.sum()),
-                          np.mean(np.sign(llr[both]) != np.sign(llr2[both]))))
-            w = np.full(len(llr), w2)
-            rel = ctl.get("second_view_reliability") or {}
-            if rel.get("enabled"):
-                # weigh the second opinion by how well the two cameras agree at that moment
-                own_ball = interpolate_ball(tracking["ball"] if own is None else own,
-                                            cfg["ball_gaps"]["interpolate_max_frames"])
-                w = w2 * view_reliability(tracking, v, own_ball, vball, rel)
-                if verbose:
-                    print("second view reliability: mean weight {:.2f} of {:.2f} where both see "
-                          "the ball".format(float(w[both].mean()) if both.any() else 0.0, w2))
-            llr = np.where(both, (1 - w) * llr + w * llr2, llr)
-            view_tr, view_ball = v, vball
-        if ctl.get("air_neutral") and tracking.get("ball_air") is not None:
-            # a ball in the air belongs to nobody yet, and neither camera knows who is under it
-            # (each projects it onto the pitch somewhere else): no team evidence there
-            llr = np.where(tracking["ball_air"], 0.0, llr)
-            if verbose:
-                print("ball in the air: no team evidence on {} frames".format(
-                    int((tracking["ball_air"] & seen).sum())))
+        llr, seen = control_evidence(tracking, ball, blocks, cfg, verbose)
         add_team_llr(e, np.where(seen, ctl["weight"], ctl["gap_weight"]) * llr)
-        if verbose:
-            print("control model {}: |llr| > 2 on {:.0%} of frames with ball".format(
-                os.path.basename(path), np.mean(np.abs(llr[seen]) > 2)))
-    # the TV director cuts to replays and close-ups mostly while the ball is dead: frames on
-    # which the broadcast is away from the live wide shot (src/possession/broadcast.py)
-    tv = c.get("tv_cut") or {}
-    tv_cut = None
-    if tv.get("enabled"):
-        if tracking.get("broadcast_live") is None:
-            raise ValueError("context.tv_cut needs broadcast.enabled (the broadcast tracking)")
-        tv_cut = ~tracking["broadcast_live"]
-        if verbose:
-            print("TV away from the live shot on {:.0%} of pseudo-dead and {:.0%} of pseudo-live "
-                  "frames".format(tv_cut[train & (y == 1)].mean(), tv_cut[train & (y == 0)].mean()))
-    if frame_period is not None:                       # FAQ: always D before the 2nd kickoff
+
+    # forced stoppages: before the 2nd-half kick-off (FAQ) and after a goal
+    if frame_period is not None:
         e[frame_period == "2nd_half_pre_kickoff", D] += 1e6
-    goal = goal_dead_mask(f, ball, tags, tracking["pitch"], cfg)
-    e[goal, D] += 1e6
-    if verbose:
-        print("goal stoppages: {:.0f} s forced dead".format(goal.sum() / 25))
+    e[goal_dead_mask(f, ball, tags, tracking["pitch"], cfg), D] += 1e6
 
     restart_evidence(e, tags, cfg)
     if c["passes"]["kick_team_llr"] > 0:
-        n_kicks = kicker_evidence(e, f, cfg)
-        if verbose:
-            print("kicks with a kicker: {}".format(n_kicks))
+        kicker_evidence(e, f, cfg)
     if c["passes"]["pass_llr"] > 0:
-        passes = pass_evidence(e, f, cfg)
-        if verbose:
-            print("completed passes found: {}".format(len(passes)))
-
-    pw = float(c["passes"].get("second_view_weight") or 0.0)
-    tc = c["passes"].get("two_camera_touch") or {}
-    if view_tr is not None and (pw > 0 or tc.get("enabled")):
-        f2 = frame_features(view_tr, view_ball, tags, cfg)   # the same features, broadcast camera
-        if pw > 0:
-            # a kick or a completed pass the broadcast sees where the tactical camera saw none
-            mine, theirs = kick_pass_llr(f, cfg), kick_pass_llr(f2, cfg)
-            extra = np.where(np.abs(mine) < 1e-9, pw * theirs, 0.0)
-            add_team_llr(e, extra)
-            if verbose:
-                print("kicks and passes only the broadcast sees: evidence on {} frames".format(
-                    int((np.abs(extra) > 0).sum())))
-        if tc.get("enabled"):
-            own = tracking.get("ball_tactical")
-            own_ball = interpolate_ball(tracking["ball"] if own is None else own,
-                                        cfg["ball_gaps"]["interpolate_max_frames"])
-            touch, found = two_camera_touches(f, f2, own_ball, view_ball, tracking["pitch"], tc)
-            add_team_llr(e, touch)
-            if verbose:
-                print("touches seen by both cameras: {}".format(found))
-    wh = c.get("whistle") or {}
-    whistle = tracking.get("whistle") if wh.get("enabled") else None
-    if whistle is not None and wh.get("llr"):
-        # a whistle stops play: dead-ball evidence for `hold_s` after it starts
-        starts = np.flatnonzero(np.diff(np.r_[0, whistle.astype(np.int8)]) == 1)
-        hold = int(wh["hold_s"] * 25)
-        for k in starts:
-            e[k:k + hold, D] += wh["llr"]
+        pass_evidence(e, f, cfg)
 
     t = c["transition_cost"]
     cost = {"team_switch": t["team_switch"], "to_dead": t["to_dead"],
-            "from_dead": restart_cost(f, cfg), "min_dead": int(round(t["min_dead_s"] * 25))}
-    if tvr.get("enabled"):
-        # restarting while the TV is away from the live shot costs more: it blocks an early
-        # restart during a replay without creating a stoppage (Codex consulta-24)
-        cost["from_dead"] = cost["from_dead"] + tvr["cost"] * tv_away
-    path = decode_by_half(e, cost, blocks)
-    labels = np.array(["H", "A", "D"])[path]
+            "from_dead": restart_cost(f, cfg), "min_dead": int(round(t["min_dead_s"] * FPS))}
+    labels = decode(e, cost, blocks)
 
     # second pass: team shape speaks where the ball is missing
     if c["shape"]["weight"] > 0:
-        shape = shape_evidence(tracking, f, labels, graded, blocks, cfg, verbose)
+        shape = shape_evidence(tracking, f, labels, graded, blocks, cfg)
         llr = c["shape"]["weight"] * np.clip(shape, -c["shape"]["clip"], c["shape"]["clip"])
-        llr = llr * ~f["seen"]
-        if team_only:                          # nor where the broadcast ball gave the team
-            llr = llr * np.isnan(ball_team[:, 0])
-        add_team_llr(e, llr)
-        path = decode_by_half(e, cost, blocks)
-        labels = np.array(["H", "A", "D"])[path]
+        add_team_llr(e, llr * ~f["seen"])
+        labels = decode(e, cost, blocks)
 
     # third pass: a stoppage needs a reason; slow players alone are not one
     if c["dead_support"]["enabled"]:
+        tv_cut = None
+        if c["tv_cut"]["enabled"]:
+            if tracking.get("broadcast_live") is None:
+                raise ValueError("context.tv_cut needs broadcast.enabled (the broadcast tracking)")
+            tv_cut = ~tracking["broadcast_live"]
         bad = unsupported_dead_spells(labels, f, ball, tags, tracking["pitch"], blocks,
-                                      frame_period, cfg)
-        if tv_cut is not None:
-            # a stoppage the TV spent on replays or close-ups has its reason
-            bad = [(s, end) for s, end in bad if tv_cut[s:end].mean() < tv["support_share"]]
-        if whistle is not None:
-            # and so has one that starts with the referee's whistle
-            lo, hi = int(wh["before_s"] * 25), int(wh["after_s"] * 25)
-            kept = len(bad)
-            bad = [(s, end) for s, end in bad if not whistle[max(0, s - lo):s + hi].any()]
-            if verbose:
-                print("dead spells kept because they start with a whistle: {}".format(kept - len(bad)))
+                                      frame_period, tv_cut, cfg)
         for s, end in bad:
             e[s:end, D] -= 1e6
         if bad:
-            path = decode_by_half(e, cost, blocks)
-            labels = np.array(["H", "A", "D"])[path]
+            labels = decode(e, cost, blocks)
         if verbose:
-            print("dead spells without support, made live: {} ({:.0f} s)".format(
-                len(bad), sum(end - s for s, end in bad) / 25))
+            print("dead spells without support, made live: {}".format(len(bad)))
 
     # fourth pass: a restart needs play; one player moving a dead ball is not one
-    rc = c.get("restart_check") or {}
-    if rc.get("enabled"):
-        moved = false_restarts(labels, f, blocks, cfg) if rc.get("spells", True) else []
+    if c["restart_check"]["enabled"]:
+        moved = false_restarts(labels, f, blocks, cfg)
         for s, end in moved:
             e[s:end, D] += 1e6
         if moved:
-            path = decode_by_half(e, cost, blocks)
-            labels = np.array(["H", "A", "D"])[path]
+            labels = decode(e, cost, blocks)
         if verbose:
-            print("false kicks (ball moved, not played): {} frames; false restarts made dead: "
-                  "{} ({:.0f} s)".format(int(f["false_kick"].sum()), len(moved),
-                                         sum(end - s for s, end in moved) / 25))
+            print("false restarts made dead: {}".format(len(moved)))
 
-    # last: stoppage edges corrected for the bias measured on the benches (#44)
-    trimmed = trim_dead(labels, e, blocks, cfg)
-    if verbose and trimmed is not labels:
-        print("stoppage edges trimmed: {:.0f} s made live".format(
-            np.sum((labels == "D") & (trimmed != "D")) / 25))
-    labels = trimmed
-
-    if verbose:
-        print("dead model: {} pseudo-dead, {} pseudo-live frames; weights {}".format(
-            int((y[train] == 1).sum()), int((y[train] == 0).sum()),
-            np.round(model[2], 2).tolist()))
-    return labels, {"p_dead": p_dead, "features": f, "pseudo": y, "emissions": e}
+    # last: stoppage edges corrected for the bias measured on the validation games
+    return trim_dead(labels, e, blocks, cfg)

@@ -1,7 +1,5 @@
-# Lo necesario para regenerar la entrega y los vídeos (python run.py). Versiones fijadas para que el CSV sea idéntico.
-# Probado con Python 3.12.4.
+# Pinned so that the CSV is identical. Tested with Python 3.12.4.
 numpy==2.5.4
 pandas==3.1.1
 PyYAML==6.0.3
-opencv-python-headless==5.0.0.93   # solo para los vídeos (video.enabled)
-imageio-ffmpeg==0.8.1              # solo para el silbato (context.whistle): lee el audio del vídeo del broadcast
+opencv-python-headless==5.0.0.93   # reads the tactical video (shirt colours, jersey.py)
